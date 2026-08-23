@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+.DS_Store
+
+# Secretos de produccion: nunca al repo (ver .env.production).
+.env.production
