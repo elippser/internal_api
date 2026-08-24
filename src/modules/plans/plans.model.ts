@@ -84,9 +84,15 @@ const limitsSchema = new Schema(
   {
     maxProperties: { type: Number, default: null },
     maxUsers: { type: Number, default: null },
-    // Creditos (tokens) de IA por mes. Informativo: el enforcement real sigue
-    // viviendo en el contrato (CONTRACTS-SPEC), que es lo que factura.
+    // Creditos (tokens) de Bookfer IA por mes. Es el cupo REAL y el unico:
+    // el gate del chat lo lee de aca (planCredits.service). Antes el enforcement
+    // vivia en un modulo `contracts` aparte, que se elimino al fusionar los dos
+    // conceptos — un plan decia que productos veias y un contrato si tenias IA,
+    // y se desincronizaban solos.
     iaMonthlyCredits: { type: Number, default: null },
+    // Dia del mes (UTC) en que se renueva el cupo. 1 = mes calendario. Se topea
+    // en 28 para que todos los meses tengan ese dia.
+    iaResetDayUTC: { type: Number, default: 1, min: 1, max: 28 },
   },
   { _id: false },
 );

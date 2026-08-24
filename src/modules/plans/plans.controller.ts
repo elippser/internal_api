@@ -5,6 +5,7 @@ import {
   plansService,
   productsService,
 } from "./plans.service";
+import { planCreditsService } from "./planCredits.service";
 import {
   PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
@@ -97,6 +98,40 @@ export const productsController = {
       req.internalUser?.userId ?? "unknown",
     );
     return ok(res, result);
+  },
+};
+
+/**
+ * Creditos de Bookfer IA. Vive en el modulo de planes porque el cupo es parte
+ * del plan: antes habia un modulo `contracts` paralelo que respondia esto y
+ * se desincronizaba con el plan de la company.
+ */
+export const planCreditsController = {
+  // S2S: pms-core/api pregunta antes de cada turno del chat.
+  async check(req: Request, res: Response) {
+    const companyId = String(
+      (req.body as { companyId?: string })?.companyId ?? "",
+    ).trim();
+    if (!companyId) {
+      return fail(res, 400, "companyId requerido", "company_required");
+    }
+    try {
+      return ok(res, await planCreditsService.checkCredits(companyId));
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
+  // Operador interno: balance de una company puntual.
+  async companyCredits(req: Request, res: Response) {
+    try {
+      return ok(
+        res,
+        await planCreditsService.getCompanyCredits(String(req.params.companyId)),
+      );
+    } catch (err) {
+      return handleErr(res, err);
+    }
   },
 };
 

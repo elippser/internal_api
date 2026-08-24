@@ -24,7 +24,6 @@ import { startMetricsCron } from "./modules/metrics/metricsCron";
 import { hotelsRouter } from "./modules/hotels/hotels.router";
 import { accessRouter } from "./modules/access/access.router";
 import { usageRouter } from "./modules/usage/usage.router";
-import { contractsRouter } from "./modules/contracts/contracts.router";
 import { plansRouter, publicPlansRouter } from "./modules/plans/plans.router";
 import { plansCodeRouter } from "./modules/plans/planscode.router";
 import { memoryRouter } from "./modules/memory/memory.router";
@@ -86,7 +85,6 @@ app.use(`${BASE}/tickets`, ticketsRouter);
 app.use(`${BASE}/hotels`, hotelsRouter);
 app.use(`${BASE}/access`, accessRouter);
 app.use(`${BASE}/usage`, usageRouter);
-app.use(`${BASE}/contracts`, contractsRouter);
 // Planes y productos comerciales. El PMS los consume via /plans/internal/*
 // con X-Internal-Secret para armar la pantalla de eleccion del alta.
 // El workspace va ANTES: montado despues, /plans lo captura primero y "code"

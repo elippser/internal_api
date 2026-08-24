@@ -29,7 +29,10 @@ import {
 } from "./services/toolAccess";
 import { Tool } from "../tools/tools.model";
 import { usageService } from "../usage/usage.service";
-import { contractsService, iaEnforcementOn } from "../contracts/contracts.service";
+import {
+  iaEnforcementOn,
+  planCreditsService,
+} from "../plans/planCredits.service";
 import { memoryService } from "../memory/memory.service";
 
 const HISTORY_WINDOW = Number(
@@ -217,10 +220,10 @@ export const conversationsService = {
       throw httpError(429, "La conversacion llego al limite de turnos");
     }
 
-    // Enforcement de creditos de IA (contrato de la company). Si no tiene
+    // Enforcement de creditos de IA (plan de la company). Si no tiene
     // creditos en el periodo, no corremos el turno. credito === token.
     if (iaEnforcementOn()) {
-      const credits = await contractsService.checkCredits(
+      const credits = await planCreditsService.checkCredits(
         session.context.companyId ?? "",
       );
       if (!credits.allowed) {
@@ -527,7 +530,7 @@ export const conversationsService = {
   // Créditos de IA de la company (bolsa mensual de tokens): consumido vs total.
   // Es lo que el sidebar del chat muestra como "uso / restante".
   async getCredits(companyId: string | undefined) {
-    const credits = await contractsService.getCompanyCredits(companyId ?? "");
+    const credits = await planCreditsService.getCompanyCredits(companyId ?? "");
     return { ...credits, enforcement: iaEnforcementOn() };
   },
 

@@ -3,6 +3,7 @@ import { authenticate } from "../../shared/middleware/authenticate";
 import { authorize } from "../../shared/middleware/authorize";
 import { requireInternalSecret } from "../../shared/middleware/internalSecret";
 import {
+  planCreditsController,
   planPageContentController,
   plansController,
   productsController,
@@ -19,6 +20,8 @@ internal.use(requireInternalSecret);
 internal.get("/catalog", plansController.publicCatalog);
 internal.get("/content", planPageContentController.internalGet);
 internal.get("/:id/entitlements", plansController.internalEntitlements);
+// Gate de creditos de Bookfer IA. Reemplaza al viejo /contracts/credits/check.
+internal.post("/credits/check", planCreditsController.check);
 plansRouter.use("/internal", internal);
 
 /* ---------------------- Operador interno ---------------------- */
@@ -60,6 +63,14 @@ plansRouter.delete(
 // "content" no se lea como un planId.
 plansRouter.get("/content", authorize("analyst"), planPageContentController.get);
 plansRouter.put("/content", authorize("admin"), planPageContentController.replace);
+
+// Creditos de IA de una company. Antes de "/:id" para que "company" no se lea
+// como un planId.
+plansRouter.get(
+  "/company/:companyId/credits",
+  authorize("analyst"),
+  planCreditsController.companyCredits,
+);
 
 // Planes.
 plansRouter.get("/", authorize("analyst"), plansController.list);
