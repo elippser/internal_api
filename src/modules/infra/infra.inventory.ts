@@ -266,11 +266,11 @@ export const INFRA_SERVICES: InfraService[] = [
     kind: "web",
     stack: "Next.js (Docker)",
     host: "sites.bookfer.com",
-    extraHosts: ["*.pages.bookfer.com"],
+    extraHosts: ["*.sites.bookfer.com"],
     purpose: "Renderer multi-tenant de los sitios web de cada hotel",
     nameHints: ["web-renderer"],
     criticality: "core",
-    note: "El unico que NO esta en Vercel. Necesita el wildcard *.pages y ser el target CNAME de los dominios propios de los hoteles: las dos cosas piden DNS en gris y certificado propio (Traefik), que en Vercel no sale gratis.",
+    note: "El unico que NO esta en Vercel. Necesita el wildcard *.sites y ser el target CNAME de los dominios propios de los hoteles: las dos cosas piden DNS en gris y certificado propio (Traefik), que en Vercel no sale gratis.",
   },
 
   // --- Interno -----------------------------------------------------------

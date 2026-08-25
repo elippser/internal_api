@@ -204,7 +204,7 @@ const PLATFORM: ExpectedRecord[] = [
       "GRIS obligatorio. Es el target al que los hoteles apuntan su propio dominio por CNAME (CUSTOM_HOSTNAME_CNAME_TARGET). En naranja, Cloudflare no encuentra la zona de ese Host y devuelve error 1014 (CNAME Cross-User Banned): el sitio del hotel no carga nunca. Solo se puede proxiar con Cloudflare for SaaS (Custom Hostnames), que es pago.",
   },
   {
-    host: "*.pages",
+    host: "*.sites",
     types: ["A", "AAAA", "CNAME"],
     service: "web-renderer",
     purpose: "Preview por subsite",
@@ -212,7 +212,7 @@ const PLATFORM: ExpectedRecord[] = [
     group: "platform",
     severity: "required",
     warning:
-      "GRIS obligatorio. El certificado Universal cubre bookfer.com y *.bookfer.com, pero NO un segundo nivel como *.pages.bookfer.com: en naranja cualquier preview da error de certificado. En gris, Traefik emite el wildcard por DNS-01. Para dejarlo naranja hace falta Advanced Certificate Manager (pago). Tiene que coincidir con PREVIEW_DOMAIN del web-renderer y NEXT_PUBLIC_HOST_WEB_RENDERER de pms-core/app.",
+      "GRIS obligatorio. El certificado Universal cubre bookfer.com y *.bookfer.com, pero NO un segundo nivel como *.sites.bookfer.com: en naranja cualquier preview da error de certificado. En gris, Traefik emite el wildcard por DNS-01. Para dejarlo naranja hace falta Advanced Certificate Manager (pago). Tiene que coincidir con PREVIEW_DOMAIN del web-renderer y NEXT_PUBLIC_HOST_WEB_RENDERER de pms-core/app.",
   },
 ];
 
@@ -299,7 +299,7 @@ export function expectedFor(
 /**
  * La regla de proxy que aplica a un hostname, mire o no el tipo.
  *
- * Se usa como guardarrail de escritura: `sites.` y `*.pages.` no se pueden
+ * Se usa como guardarrail de escritura: `sites.` y `*.sites.` no se pueden
  * poner en naranja aunque el tipo con el que los crees no sea el del
  * inventario.
  */
