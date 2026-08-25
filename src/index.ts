@@ -68,6 +68,18 @@ app.use(
     credentials: true,
   }),
 );
+// Ninguna respuesta de esta API se guarda en ningun lado. El
+// Access-Control-Allow-Origin depende de QUIEN pregunta, y una copia cacheada
+// conserva el origen del primero que la pidio y se la sirve a los demas: eso
+// rompio rooms con "Failed to fetch" el 24-08-2026. Sin este header aplica el
+// default de Vercel (`public, max-age=0, must-revalidate`), cuyo `public`
+// habilita al browser a guardarla. `Vary: Origin` que ya manda cors solo
+// protege a las caches que lo respetan.
+app.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 
