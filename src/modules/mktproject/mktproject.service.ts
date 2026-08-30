@@ -20,13 +20,13 @@ import path from "path";
  * cadena vacía no es nullish, así que sin este helper `MKT_PROJECT_DIR=` haría
  * que el repo se resolviera contra el cwd del proceso.
  */
-function env(name: string, fallback: string): string {
+export function env(name: string, fallback: string): string {
   const value = process.env[name];
   return value && value.trim() ? value.trim() : fallback;
 }
 
 /** Raíz del repo. `MKT_PROJECT_DIR` la pisa (útil si se despliega aparte). */
-const PROJECT_DIR = path.resolve(
+export const PROJECT_DIR = path.resolve(
   env(
     "MKT_PROJECT_DIR",
     // src/modules/mktproject -> api -> internal-laupser -> raíz del monorepo.

@@ -4,6 +4,7 @@ import { authenticate } from "../../shared/middleware/authenticate";
 import { authorize } from "../../shared/middleware/authorize";
 import { fail, ok } from "../../shared/utils/http";
 import { htmlToJsx } from "./htmlToJsx";
+import { deploymentState, publish, publishStatus } from "./mktproject.publish";
 import { mktprojectService } from "./mktproject.service";
 
 /**
@@ -189,6 +190,53 @@ mktprojectRouter.post("/html-to-jsx", async (req, res) => {
   if (error) return fail(res, 400, error.message, "invalid_body");
   try {
     return ok(res, htmlToJsx(value.html));
+  } catch (err) {
+    return handleErr(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Publicar
+//
+// Guardar un archivo escribe el repo y nada mas. Estas tres rutas son lo que
+// convierte eso en un cambio visible en produccion: commit, push y build.
+// ---------------------------------------------------------------------------
+
+mktprojectRouter.get("/publish/status", async (_req, res) => {
+  try {
+    return ok(res, await publishStatus());
+  } catch (err) {
+    return handleErr(res, err);
+  }
+});
+
+mktprojectRouter.post("/publish", async (req, res) => {
+  const { error, value } = Joi.object({
+    message: Joi.string().trim().min(3).max(200).required(),
+    force: Joi.boolean().default(false),
+  }).validate(req.body);
+  if (error) return fail(res, 400, error.message, "invalid_body");
+  try {
+    return ok(
+      res,
+      await publish({
+        message: value.message,
+        authorEmail: req.internalUser?.email ?? "",
+        force: value.force,
+      }),
+    );
+  } catch (err) {
+    return handleErr(res, err);
+  }
+});
+
+mktprojectRouter.get("/publish/deployment/:uuid", async (req, res) => {
+  const { error, value } = Joi.object({
+    uuid: Joi.string().alphanum().max(64).required(),
+  }).validate(req.params);
+  if (error) return fail(res, 400, error.message, "invalid_params");
+  try {
+    return ok(res, await deploymentState(value.uuid));
   } catch (err) {
     return handleErr(res, err);
   }

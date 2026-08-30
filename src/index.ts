@@ -56,15 +56,58 @@ import { startRadarCron } from "./modules/competitors/radar/radarCron";
 import { startSignalsCron } from "./modules/competitors/signals/signalsCron";
 import { startMentionDetectorCron } from "./modules/competitors/mentions/mentionDetector";
 import { globalRouter } from "./modules/global/global.router";
+import { climateRouter } from "./modules/climate/climate.router";
+import { calendarRouter } from "./modules/calendar/calendar.router";
+import { sportsRouter } from "./modules/sports/sports.router";
+import { cultureRouter } from "./modules/culture/culture.router";
+import { miceRouter } from "./modules/mice/mice.router";
 import { engineRouter } from "./modules/engine/engine.router";
 import { bootstrapEngine, shutdownWorker } from "./engine";
 
 const app = express();
 
 app.use(helmet());
+
+/**
+ * Origenes que pueden hablar con esta API desde un navegador.
+ *
+ * Son DOS familias distintas y por eso no alcanza con `WEB_URL`:
+ *
+ * 1. El panel interno (`WEB_URL`), que manda JWT y necesita `credentials`.
+ * 2. El sitio publico de bookfer, que postea el formulario de leads a
+ *    `POST /public/mkt/leads` desde el browser. Sin esto el LeadForm de
+ *    bookfer.com falla en produccion con un error de CORS y el lead se pierde
+ *    en silencio: el `fetch` rechaza y el visitante ve "Error de red".
+ *
+ * `PUBLIC_SITE_ORIGINS` permite sumar mas (staging, un dominio nuevo) sin
+ * tocar codigo. Se separa por comas y se limpia la barra final, porque el
+ * header `Origin` nunca la trae y `https://bookfer.com/` no matchearia nunca.
+ */
+const trimSlash = (value: string) => value.trim().replace(/\/+$/, "");
+
+const CORS_ORIGINS = new Set(
+  [
+    process.env.WEB_URL ?? "http://localhost:8500",
+    "https://bookfer.com",
+    "https://www.bookfer.com",
+    "http://localhost:6300",
+    ...(process.env.PUBLIC_SITE_ORIGINS ?? "").split(","),
+  ]
+    .map(trimSlash)
+    .filter(Boolean),
+);
+
 app.use(
   cors({
-    origin: process.env.WEB_URL ?? "http://localhost:8500",
+    origin(origin, callback) {
+      // Sin `Origin` es una llamada que no viene de un browser (curl, el
+      // server de Next pidiendo los planes, un health check): no hay nada que
+      // autorizar.
+      if (!origin || CORS_ORIGINS.has(trimSlash(origin))) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
   }),
 );
@@ -145,6 +188,19 @@ app.use("/public/mkt/leads", publicLeadRouter);
 app.use("/public/plans", publicPlansRouter);
 app.use("/public/mkt/nps", publicNpsRouter);
 app.use("/s", publicSiteRouter);
+
+// Hubs propios de la vista /global (event-list.md §1 a §5): escritos a mano,
+// NO son parte del port de elippser-gl. Van montados ANTES de globalRouter
+// para que sus rutas no dependan del fall-through del router portado.
+const globalHubCors = (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+};
+app.use("/api/global/climate", globalHubCors, climateRouter);
+app.use("/api/global/calendar", globalHubCors, calendarRouter);
+app.use("/api/global/sports", globalHubCors, sportsRouter);
+app.use("/api/global/culture", globalHubCors, cultureRouter);
+app.use("/api/global/mice", globalHubCors, miceRouter);
 
 // Feeds de elippser para la vista /global. Van fuera de /api/v1 porque son
 // los route handlers portados tal cual desde elippser-gl y conservan sus
