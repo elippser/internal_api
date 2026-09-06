@@ -102,7 +102,7 @@ export const productsController = {
 };
 
 /**
- * Creditos de Bookfer IA. Vive en el modulo de planes porque el cupo es parte
+ * Creditos de Roombir IA. Vive en el modulo de planes porque el cupo es parte
  * del plan: antes habia un modulo `contracts` paralelo que respondia esto y
  * se desincronizaba con el plan de la company.
  */
@@ -257,7 +257,7 @@ export const planPageContentController = {
 };
 
 /**
- * El catalogo de planes para el sitio publico de bookfer.
+ * El catalogo de planes para el sitio publico de roombir.
  *
  * Va sin JWT porque lo consume `<PlansMkt/>` desde el renderer del sitio, que
  * lo renderiza para cualquiera que entre. Devuelve MENOS que el catalogo del

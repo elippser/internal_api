@@ -1,4 +1,4 @@
-// Sub-agentes operativos / de consulta de bookfer-IA.
+// Sub-agentes operativos / de consulta de roombir-IA.
 //
 // Cada turno del chat se enruta (ver taskRouter) a UNO de estos perfiles segun
 // la complejidad real de la tarea, para no pagar Opus por algo trivial ni

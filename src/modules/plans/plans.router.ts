@@ -20,7 +20,7 @@ internal.use(requireInternalSecret);
 internal.get("/catalog", plansController.publicCatalog);
 internal.get("/content", planPageContentController.internalGet);
 internal.get("/:id/entitlements", plansController.internalEntitlements);
-// Gate de creditos de Bookfer IA. Reemplaza al viejo /contracts/credits/check.
+// Gate de creditos de Roombir IA. Reemplaza al viejo /contracts/credits/check.
 internal.post("/credits/check", planCreditsController.check);
 plansRouter.use("/internal", internal);
 
@@ -85,7 +85,7 @@ plansRouter.patch("/:id", authorize("admin"), plansController.update);
 plansRouter.delete("/:id", authorize("admin"), plansController.remove);
 
 /**
- * Superficie publica: la consume el sitio de bookfer. Se monta aparte (fuera de
+ * Superficie publica: la consume el sitio de roombir. Se monta aparte (fuera de
  * /api/v1) porque no lleva JWT — ver `publicPlansRouter` en index.ts.
  */
 export const publicPlansRouter = Router();

@@ -6,7 +6,7 @@ import { env, PROJECT_DIR } from "./mktproject.service";
  * Publicar el sitio público.
  *
  * El resto del módulo escribe el repo con `fs` y ahí termina. Eso alcanzaba
- * cuando `bookfer.com` se servía desde otro lado, pero desde el 30-08-2026 el
+ * cuando `roombir.com` se servía desde otro lado, pero desde el 30-08-2026 el
  * sitio se deploya en Coolify **desde GitHub**: un archivo guardado en
  * Marketing › Sitio no llega a producción hasta que alguien commitea, pushea y
  * dispara el build. Este archivo es esos tres pasos.
@@ -39,7 +39,7 @@ function coolifyApi(path: string): string {
 }
 
 /** Host público, sólo para el texto de la UI. */
-const PUBLIC_HOST = env("MKT_PUBLIC_HOST", "bookfer.com");
+const PUBLIC_HOST = env("MKT_PUBLIC_HOST", "roombir.com");
 
 interface HttpError extends Error {
   status: number;
@@ -322,7 +322,7 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
       );
     }
 
-    const author = input.authorEmail || "panel@bookfer.com";
+    const author = input.authorEmail || "panel@roombir.com";
     await git([
       "-c",
       `user.name=${author.split("@")[0]}`,

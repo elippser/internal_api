@@ -829,7 +829,7 @@ function actionErrorMessage(err: ToolExecutionError): string {
       // La política del agente ya arma el mensaje con el permiso que falta.
       return err.message;
     case "unauthorized":
-      return "No se pudo autenticar la acción contra el sistema. Reportalo al equipo bookfer.";
+      return "No se pudo autenticar la acción contra el sistema. Reportalo al equipo roombir.";
     case "validation":
       return `No se pudo completar: ${err.message}`;
     case "not_found":

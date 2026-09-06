@@ -30,7 +30,7 @@ async function gql<T>(query: string, variables: Record<string, unknown>): Promis
     const res = await fetch("https://api.producthunt.com/v2/api/graphql", {
       method: "POST",
       signal: ctrl.signal,
-      headers: { "content-type": "application/json", authorization: `Bearer ${token()}`, "user-agent": "bookfer-internal/1.0" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${token()}`, "user-agent": "roombir-internal/1.0" },
       body: JSON.stringify({ query, variables }),
     });
     if (!res.ok) return { ok: false, json: null, error: `http_${res.status}` };

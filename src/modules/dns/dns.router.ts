@@ -4,7 +4,7 @@ import { authorize } from "../../shared/middleware/authorize";
 import { dnsController as c } from "./dns.controller";
 
 /**
- * /api/v1/mkt/dns — gestor de DNS de la zona bookfer.com en Cloudflare.
+ * /api/v1/mkt/dns — gestor de DNS de la zona roombir.com en Cloudflare.
  *
  * Los pisos de rol son distintos a proposito:
  *  - LEER es `developer`, como /mkt/site: la zona dice donde vive cada app y

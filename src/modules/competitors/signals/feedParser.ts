@@ -113,7 +113,7 @@ export async function discoverFeedUrl(pageUrl: string, html: string | null): Pro
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 6_000);
-      const res = await fetch(candidate, { signal: ctrl.signal, headers: { "user-agent": "bookfer-internal/1.0 (+https://bookfer.com)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5" } });
+      const res = await fetch(candidate, { signal: ctrl.signal, headers: { "user-agent": "roombir-internal/1.0 (+https://roombir.com)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5" } });
       clearTimeout(t);
       if (!res.ok) continue;
       const ctype = res.headers.get("content-type") ?? "";
@@ -133,7 +133,7 @@ export async function fetchFeed(url: string): Promise<{ ok: boolean; items: Feed
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 10_000);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, headers: { "user-agent": "bookfer-internal/1.0 (+https://bookfer.com)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5" } });
+    const res = await fetch(url, { signal: ctrl.signal, headers: { "user-agent": "roombir-internal/1.0 (+https://roombir.com)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5" } });
     if (!res.ok) return { ok: false, items: [], title: "", error: `http_${res.status}` };
     const xml = await res.text();
     const parsed = parseFeed(xml);

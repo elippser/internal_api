@@ -15,7 +15,7 @@ import type {
  */
 
 const RADAR_SYSTEM =
-  "Sos el radar de competencia de bookfer (PMS + motor de reservas para alojamientos chicos, foco LATAM). " +
+  "Sos el radar de competencia de Roombir (PMS + motor de reservas para alojamientos chicos, foco LATAM). " +
   "Con la búsqueda web, encontrá PRODUCTOS DE SOFTWARE para hoteles/alojamientos (PMS, motor de reservas, channel manager, suites) " +
   "que parezcan nuevos, recién lanzados o en crecimiento, priorizando resultados de los últimos 90 días. " +
   "Ignorá directorios, notas de prensa genéricas, consultoras, agencias y hoteles. " +

@@ -20,7 +20,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { connectDB } from "../shared/db";
 
-const KEEP_ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@bookfer.com";
+const KEEP_ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@roombir.com";
 
 async function snapshot(db: mongoose.mongo.Db) {
   const names = [

@@ -21,7 +21,7 @@ export interface PageResult {
 const DEFAULT_TIMEOUT_MS = Number(process.env.CI_FETCH_TIMEOUT_MS ?? 10_000);
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 const USER_AGENT =
-  "Mozilla/5.0 (compatible; bookfer-internal/1.0; +https://bookfer.com)";
+  "Mozilla/5.0 (compatible; roombir-internal/1.0; +https://roombir.com)";
 
 export function stripHtml(html: string): string {
   return html

@@ -54,7 +54,7 @@ export const redditConnector: SignalConnector = {
     for (const alias of aliases) {
       const q = encodeURIComponent(`"${alias}"`);
       const r = await fetchJsonPublic<RedditSearch>(`https://www.reddit.com/search.json?q=${q}&sort=new&t=month&limit=25`, {
-        headers: { "user-agent": "bookfer-internal:competitive-intel:1.0 (by /u/bookfer)" },
+        headers: { "user-agent": "roombir-internal:competitive-intel:1.0 (by /u/roombir)" },
       });
       if (!r.ok) {
         if (r.status === 429) await sleep(7_000);

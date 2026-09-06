@@ -12,7 +12,7 @@ import { MktPage, MktSite } from "../modules/mktsite/mktsite.model";
  * proyecto Next. Para llevar una página de HTML a JSX está
  * `migrateMktSiteToNext.ts` (y `POST /mkt/project/html-to-jsx` desde el panel).
  *
- * Importa el landing de `mkt-project/web` como home del sitio de bookfer.
+ * Importa el landing de `mkt-project/web` como home del sitio de roombir.
  *
  * El repo lo tiene como tres archivos sueltos (html/css/js) sin build ni
  * conexion al monorepo. Acá se parte en las tres pestañas del editor:
@@ -30,7 +30,7 @@ const SOURCE_DIR = path.resolve(
   __dirname,
   "../../../../mkt-project/web",
 );
-const SITE_SLUG = process.env.MKT_SITE_SLUG ?? "bookfer";
+const SITE_SLUG = process.env.MKT_SITE_SLUG ?? "roombir";
 
 function read(file: string): string {
   const full = path.join(SOURCE_DIR, file);
@@ -88,7 +88,7 @@ async function main() {
   if (!site) {
     site = await MktSite.create({
       siteId: makeId("site"),
-      name: "Bookfer",
+      name: "roombir",
       slug: SITE_SLUG,
       status: "published",
       createdByUserId: "import",
@@ -123,7 +123,7 @@ async function main() {
   page.set("js", js);
   page.set("seo", {
     ...(page.seo ?? {}),
-    title: page.seo?.title || "Bookfer",
+    title: page.seo?.title || "roombir",
   });
   await page.save();
 

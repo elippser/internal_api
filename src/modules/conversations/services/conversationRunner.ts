@@ -24,11 +24,11 @@ const MAX_ITERATIONS = Number(process.env.MAX_TOOL_ITERATIONS ?? 5);
 
 // Kill-switch de las server tools de Anthropic. Si la org no tiene habilitada
 // web search / code execution, prenderlas haría fallar todos los turnos de los
-// tiers que las usan: apagar con BOOKFER_WEB_SEARCH=false / BOOKFER_CODE_EXEC=false.
+// tiers que las usan: apagar con ROOMBIR_WEB_SEARCH=false / ROOMBIR_CODE_EXEC=false.
 const WEB_SEARCH_ON =
-  (process.env.BOOKFER_WEB_SEARCH ?? process.env.LAUPSER_WEB_SEARCH ?? "true").toLowerCase() !== "false";
+  (process.env.ROOMBIR_WEB_SEARCH ?? process.env.LAUPSER_WEB_SEARCH ?? "true").toLowerCase() !== "false";
 const CODE_EXEC_ON =
-  (process.env.BOOKFER_CODE_EXEC ?? process.env.LAUPSER_CODE_EXEC ?? "true").toLowerCase() !== "false";
+  (process.env.ROOMBIR_CODE_EXEC ?? process.env.LAUPSER_CODE_EXEC ?? "true").toLowerCase() !== "false";
 
 // Piso de capacidad para agentes operativos (con tools de escritura/PMS). Un
 // modelo de la familia "haiku" no orquesta tools de forma confiable: deflexiona
@@ -1118,7 +1118,7 @@ function buildToolErrorOutput(
       // (AGENT_JWT_SECRET desincronizado entre internal y el PMS) — no
       // un error del usuario. Lo reportamos como tal para que el agente
       // no se confunda y pida "volver a logearse".
-      message = `No pude autenticarme contra el sistema para ejecutar "${displayName}". Reporta este error al equipo bookfer, no es algo que puedas resolver desde la conversacion.`;
+      message = `No pude autenticarme contra el sistema para ejecutar "${displayName}". Reporta este error al equipo roombir, no es algo que puedas resolver desde la conversacion.`;
       code = "auth_failed";
       break;
     case "forbidden":
@@ -1154,7 +1154,7 @@ function buildToolErrorOutput(
       code = "network_error";
       break;
     case "config":
-      message = `"${displayName}" no esta configurada correctamente en el servidor. Reporta este error al equipo bookfer.`;
+      message = `"${displayName}" no esta configurada correctamente en el servidor. Reporta este error al equipo roombir.`;
       code = "server_misconfigured";
       break;
     default:

@@ -3,7 +3,7 @@ import { usageService } from "../usage/usage.service";
 import { Plan } from "./plans.model";
 
 /**
- * Créditos de Bookfer IA resueltos DESDE EL PLAN de la company.
+ * Créditos de Roombir IA resueltos DESDE EL PLAN de la company.
  *
  * Antes esto vivía en un módulo `contracts` paralelo: una company tenía un plan
  * (que decía qué productos veía) y además un contrato (que decía si tenía IA y
@@ -25,7 +25,7 @@ import { Plan } from "./plans.model";
  *   snapshot.
  */
 
-export const IA_PRODUCT_KEY = "bookfer-ia";
+export const IA_PRODUCT_KEY = "roombir-ia";
 
 export type CreditsReason =
   | "ok"
@@ -75,9 +75,9 @@ function currentPeriod(resetDayUTC: number): { start: Date; end: Date } {
 export function creditsMessage(c: CompanyCredits): string {
   switch (c.reason) {
     case "no_plan":
-      return "Esta cuenta todavia no tiene un plan asignado. Elegi un plan para habilitar Bookfer IA.";
+      return "Esta cuenta todavia no tiene un plan asignado. Elegi un plan para habilitar Roombir IA.";
     case "ia_not_in_plan":
-      return "El plan de esta cuenta no incluye Bookfer IA. Cambia de plan para habilitarlo.";
+      return "El plan de esta cuenta no incluye Roombir IA. Cambia de plan para habilitarlo.";
     case "no_credits": {
       const reset = c.periodEnd
         ? new Date(c.periodEnd).toLocaleDateString("es-AR", { timeZone: "UTC" })

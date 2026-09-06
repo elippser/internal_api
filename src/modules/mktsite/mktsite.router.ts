@@ -10,7 +10,7 @@ export const mktsiteRouter = Router();
 /**
  * Sirve el sitio publicado en /s/:slug. Sin JWT.
  *
- * DEPRECADO. El sitio de bookfer se mudó a `public-side/mkt-renderer`, un repo
+ * DEPRECADO. El sitio de Roombir se mudó a `public-side/mkt-renderer`, un repo
  * Next que el panel edita como proyecto (ver el módulo `mktproject`). Esto
  * queda en pie porque el sitio viejo sigue publicado en Mongo y despublicarlo
  * es una decisión, no un efecto secundario de la migración: mientras la fila
@@ -107,7 +107,7 @@ publicLeadRouter.post("/", async (req: Request, res: Response) => {
   try {
     await mktsiteService.captureLead(value);
     // No se devuelve si la cuenta ya existia: es informacion sobre quien esta
-    // en la base de bookfer y este endpoint es publico.
+    // en la base de Roombir y este endpoint es publico.
     return ok(res, { received: true }, 201);
   } catch (err) {
     return handleErr(res, err);

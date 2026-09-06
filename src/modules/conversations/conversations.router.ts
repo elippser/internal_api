@@ -59,7 +59,7 @@ runtime.post(
 
 conversationsRouter.use("/sessions", runtime);
 
-// ---------- Audit: equipo bookfer ----------
+// ---------- Audit: equipo Roombir ----------
 // Montado en raiz. NOTA: definimos rutas explicitas en vez de un
 // /:id catch-all para evitar que "sessions" sea interpretado como id.
 const audit = Router();

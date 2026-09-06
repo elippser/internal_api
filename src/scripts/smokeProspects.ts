@@ -68,7 +68,7 @@ async function main() {
   const first = await prospectsService.logActivity(
     created.prospectId,
     { type: "call", outcome: "no_answer", notes: "Sono y corto" },
-    { userId: "smoke", email: "smoke@bookfer.com" },
+    { userId: "smoke", email: "smoke@roombir.com" },
   );
   console.log(
     `  intentos ${first.prospect.attempts} · etapa ${first.prospect.status}` +
@@ -89,7 +89,7 @@ async function main() {
       nextActionAt: manana,
       nextActionNote: "Volver a llamar a la manana",
     },
-    { userId: "smoke", email: "smoke@bookfer.com" },
+    { userId: "smoke", email: "smoke@roombir.com" },
   );
   console.log(
     `  intentos ${second.prospect.attempts} · etapa ${second.prospect.status}` +

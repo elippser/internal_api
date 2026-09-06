@@ -64,7 +64,7 @@ export const EXTRA_SURFACES: HubDef[] = [
     // propios embudos, no con app_opened.
     apps: ["motor-publico", "sitio-publico", "linkhub-publico", "staypass"],
   },
-  { key: "ia", label: "Bookfer IA", apps: ["bookfer-ia"] },
+  { key: "ia", label: "Roombir IA", apps: ["roombir-ia"] },
 ];
 
 export const ALL_HUBS = [...HUBS, ...EXTRA_SURFACES];

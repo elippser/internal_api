@@ -2,14 +2,14 @@
  * Cliente de la API v4 de Cloudflare, acotado a DNS de una zona.
  *
  * CREDENCIAL: un **API Token** (no la Global API Key). El token viaja como
- * `Authorization: Bearer`, esta acotado a la zona de bookfer.com y se puede
+ * `Authorization: Bearer`, esta acotado a la zona de roombir.com y se puede
  * revocar solo. La Global API Key da acceso total a la cuenta con un header
  * distinto (`X-Auth-Key` + `X-Auth-Email`) y no la soportamos a proposito.
  *
- * Permisos que necesita el token (ver DNS-CLOUDFLARE-BOOKFER.md):
+ * Permisos que necesita el token (ver DNS-CLOUDFLARE-roombir.md):
  *   Zone → DNS  → Edit    (leer y escribir registros)
  *   Zone → Zone → Read    (resolver el zoneId por nombre y leer el estado)
- * Zone Resources: Include → Specific zone → bookfer.com
+ * Zone Resources: Include → Specific zone → roombir.com
  *
  * NO se reutiliza `CLOUDFLARE_API_TOKEN`: ese es el de Radar (`Account →
  * Radar → Read`) que consume /api/global. Un token de Radar no puede tocar
@@ -53,7 +53,7 @@ export interface CfDnsRecord {
   id: string;
   zone_id?: string;
   zone_name?: string;
-  /** FQDN completo: `app.bookfer.com`, no `app`. */
+  /** FQDN completo: `app.roombir.com`, no `app`. */
   name: string;
   type: string;
   content: string;

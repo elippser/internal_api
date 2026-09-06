@@ -1,7 +1,7 @@
 /**
  * Abstraccion de proveedores de envio.
  *
- * Hoy bookfer no tiene ni cuenta de Resend propia ni WABA, asi que el driver
+ * Hoy Roombir no tiene ni cuenta de Resend propia ni WABA, asi que el driver
  * por defecto es `noop`: registra el envio y lo marca como mandado sin salir a
  * la red. Eso permite construir y probar templates, segmentos, cola,
  * idempotencia y reportes enteros, y que enchufar el proveedor real despues sea

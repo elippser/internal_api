@@ -2,7 +2,7 @@ import { Schema, model, type InferSchemaType } from "mongoose";
 
 /**
  * Prospectos: la lista de alojamientos a los que hay que LLAMAR para ofrecerles
- * bookfer. Es el paso previo al CRM (`mkt_accounts`): mientras no haya
+ * roombir. Es el paso previo al CRM (`mkt_accounts`): mientras no haya
  * conversacion no hay cuenta, y no tiene sentido ensuciar el embudo comercial
  * con cientos de perfiles de Instagram que nadie llamo todavia.
  *

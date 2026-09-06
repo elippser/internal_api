@@ -385,7 +385,7 @@ export const metricsService = {
   },
 
   /**
-   * Sesiones de Bookfer IA con sus métricas por conversación.
+   * Sesiones de Roombir IA con sus métricas por conversación.
    *
    * El módulo `/conversations` ya permite auditar una conversación suelta, pero
    * no responde las preguntas del piloto: quién usa el agente, cuánto, qué

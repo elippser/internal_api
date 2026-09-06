@@ -21,7 +21,7 @@ const GENERIC = new Set(["suite", "cloud", "pms", "hotel", "hoteles", "app", "so
 const TZ = "America/Argentina/Buenos_Aires";
 
 const SYSTEM =
-  "Sos un analista de ventas de bookfer (software hotelero). Te paso un fragmento de una conversación o nota del CRM " +
+  "Sos un analista de ventas de Roombir (software hotelero). Te paso un fragmento de una conversación o nota del CRM " +
   "donde aparece el nombre de un posible competidor. Decidí si el prospecto/cliente está realmente nombrando a ese " +
   'competidor como software que usa, usó, evalúa o compara. Devolvé SOLO JSON: {"isMention":boolean,' +
   '"context":"demo"|"call"|"whatsapp"|"email"|"event"|"web_form"|"other","summary":string (qué dijo, 1 línea, español),' +

@@ -1,7 +1,7 @@
 /**
- * Inventario esperado de la zona `bookfer.com`.
+ * Inventario esperado de la zona `roombir.com`.
  *
- * Es la traduccion a codigo de DNS-CLOUDFLARE-BOOKFER.md: cada hostname de aca
+ * Es la traduccion a codigo de DNS-CLOUDFLARE-roombir.md: cada hostname de aca
  * esta referenciado por al menos un `.env.production` del monorepo. Si borras
  * un registro, algo deja de resolver.
  *
@@ -38,7 +38,7 @@ export interface ExpectedRecord {
   suggestedContent?: string;
 }
 
-export const ZONE_DEFAULT = "bookfer.com";
+export const ZONE_DEFAULT = "roombir.com";
 
 /**
  * Los 17 de plataforma (apex + www + 15 subdominios) + el wildcard de previews.
@@ -50,7 +50,7 @@ const PLATFORM: ExpectedRecord[] = [
     host: "",
     types: ["A", "AAAA", "CNAME"],
     service: "mkt-renderer",
-    purpose: "Sitio publico de bookfer",
+    purpose: "Sitio publico de roombir",
     proxy: true,
     group: "platform",
     severity: "required",
@@ -212,7 +212,7 @@ const PLATFORM: ExpectedRecord[] = [
     group: "platform",
     severity: "required",
     warning:
-      "GRIS obligatorio. El certificado Universal cubre bookfer.com y *.bookfer.com, pero NO un segundo nivel como *.sites.bookfer.com: en naranja cualquier preview da error de certificado. En gris, Traefik emite el wildcard por DNS-01. Para dejarlo naranja hace falta Advanced Certificate Manager (pago). Tiene que coincidir con PREVIEW_DOMAIN del web-renderer y NEXT_PUBLIC_HOST_WEB_RENDERER de pms-core/app.",
+      "GRIS obligatorio. El certificado Universal cubre roombir.com y *.roombir.com, pero NO un segundo nivel como *.sites.roombir.com: en naranja cualquier preview da error de certificado. En gris, Traefik emite el wildcard por DNS-01. Para dejarlo naranja hace falta Advanced Certificate Manager (pago). Tiene que coincidir con PREVIEW_DOMAIN del web-renderer y NEXT_PUBLIC_HOST_WEB_RENDERER de pms-core/app.",
   },
 ];
 
@@ -254,7 +254,7 @@ const EMAIL: ExpectedRecord[] = [
     proxy: null,
     group: "email",
     severity: "recommended",
-    suggestedContent: "v=DMARC1; p=none; rua=mailto:dmarc@bookfer.com",
+    suggestedContent: "v=DMARC1; p=none; rua=mailto:dmarc@roombir.com",
   },
 ];
 
@@ -264,7 +264,7 @@ export const EXPECTED_RECORDS: ExpectedRecord[] = [...PLATFORM, ...EMAIL];
  * Hostnames que NO hay que crear, con el motivo.
  *
  * `trends` esta en el `.env.production` de internal como
- * `https://trends.bookfer.com`, pero el trends-service solo lo consume
+ * `https://trends.roombir.com`, pero el trends-service solo lo consume
  * api-internal y no tiene ninguna autenticacion: publicarlo es regalar un proxy
  * de scraping de Google. Va por red interna (`http://trends-service:8700`).
  */
@@ -276,7 +276,7 @@ export const FORBIDDEN_HOSTS: Array<{ host: string; reason: string }> = [
   },
 ];
 
-/** `app` + `bookfer.com` → `app.bookfer.com`; "" → `bookfer.com`. */
+/** `app` + `roombir.com` → `app.roombir.com`; "" → `roombir.com`. */
 export function fqdn(host: string, zone: string): string {
   return host === "" || host === "@" ? zone : `${host}.${zone}`;
 }

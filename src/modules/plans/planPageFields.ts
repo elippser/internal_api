@@ -93,11 +93,11 @@ export const PLAN_PAGE_FIELDS: PlanPageFieldDef[] = [
     vars: [],
     fallbackKey: "planSelection.subtitulo",
     defaults: {
-      es: "El plan es de la empresa y define qué productos de bookfer podés usar. Lo podés cambiar cuando quieras.",
-      en: "The plan belongs to the company and defines which bookfer products you can use. You can change it whenever you want.",
-      fr: "Le forfait appartient à l'entreprise et définit les produits bookfer auxquels vous avez accès. Vous pouvez en changer quand vous le souhaitez.",
-      de: "Der Tarif gehört zum Unternehmen und legt fest, welche bookfer-Produkte Sie nutzen können. Sie können ihn jederzeit wechseln.",
-      pt: "O plano é da empresa e define quais produtos do bookfer você pode usar. Você pode trocá-lo quando quiser.",
+      es: "El plan es de la empresa y define qué productos de Roombir podés usar. Lo podés cambiar cuando quieras.",
+      en: "The plan belongs to the company and defines which Roombir products you can use. You can change it whenever you want.",
+      fr: "Le forfait appartient à l'entreprise et définit les produits Roombir auxquels vous avez accès. Vous pouvez en changer quand vous le souhaitez.",
+      de: "Der Tarif gehört zum Unternehmen und legt fest, welche roombir-Produkte Sie nutzen können. Sie können ihn jederzeit wechseln.",
+      pt: "O plano é da empresa e define quais produtos do Roombir você pode usar. Você pode trocá-lo quando quiser.",
     },
   },
   {

@@ -1,7 +1,7 @@
 import Joi from "joi";
 
 /**
- * Tipos que el panel deja crear. Son los que la zona de bookfer necesita
+ * Tipos que el panel deja crear. Son los que la zona de Roombir necesita
  * (plataforma + Resend). Un registro de otro tipo que ya exista en Cloudflare
  * se lista y se puede editar o borrar igual: lo que se acota es el alta.
  */

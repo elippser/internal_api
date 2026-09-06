@@ -54,7 +54,7 @@ export const PRODUCT_SEED: SeedProduct[] = [
     key: "pms-core",
     name: "Escritorio PMS",
     description:
-      "El escritorio de bookfer: navegación, contexto de empresa/propiedad/espacio, inicio y ajustes. Es la base sobre la que se monta el resto de los productos.",
+      "El escritorio de roombir: navegación, contexto de empresa/propiedad/espacio, inicio y ajustes. Es la base sobre la que se monta el resto de los productos.",
     category: "core",
     appIds: [],
     routes: ["/", "/settings", "/profile", "/company", "/account", "/soporte"],
@@ -238,13 +238,13 @@ export const PRODUCT_SEED: SeedProduct[] = [
     order: 150,
   },
   {
-    key: "bookfer-ia",
-    name: "Bookfer IA",
+    key: "roombir-ia",
+    name: "Roombir IA",
     description:
       "El asistente conversacional del PMS: consulta y opera el sistema con herramientas. Consume créditos del contrato de IA.",
     category: "ia",
     appIds: [],
-    routes: ["/bookfer-ia"],
+    routes: ["/roombir-ia"],
     icon: "Sparkles",
     core: false,
     order: 160,

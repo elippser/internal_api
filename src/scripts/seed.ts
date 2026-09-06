@@ -8,7 +8,7 @@ import { INITIAL_TOOLS, Tool } from "../modules/tools/tools.model";
 
 // Credenciales del super_admin inicial. Sobreescribibles por entorno para no
 // tener que tocar el script cuando cambian (ver ADMIN_EMAIL/ADMIN_PASSWORD).
-const SEED_EMAIL = process.env.ADMIN_EMAIL ?? "admin@bookfer.com";
+const SEED_EMAIL = process.env.ADMIN_EMAIL ?? "admin@roombir.com";
 const SEED_PASSWORD = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
 
 async function seed() {

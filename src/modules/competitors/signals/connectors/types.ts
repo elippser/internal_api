@@ -200,7 +200,7 @@ export async function fetchJsonPublic<T = unknown>(
     try {
       const res = await fetch(url, {
         signal: ctrl.signal,
-        headers: { "user-agent": "bookfer-internal/1.0 (+https://bookfer.com; competitive-intel)", accept: "application/json", ...(opts.headers ?? {}) },
+        headers: { "user-agent": "roombir-internal/1.0 (+https://roombir.com; competitive-intel)", accept: "application/json", ...(opts.headers ?? {}) },
       });
       const body = await res.text();
       if (!res.ok) {

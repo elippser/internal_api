@@ -1,0 +1,44 @@
+// Router del hub de seguridad y estabilidad. Se monta en
+// /api/global/security (ver index.ts): mismo perimetro que los otros hubs,
+// escrito a mano.
+//
+// No toma radiusKm: alertas, homicidios y brotes son del pais entero.
+// `days` acota la ventana de conflictividad social.
+
+import { Router, type Request, type Response } from "express";
+import { getSecurityPoint } from "./security.service";
+
+export const securityRouter = Router();
+
+securityRouter.get("/point", async (req: Request, res: Response) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  const days = req.query.days === undefined ? 7 : Number(req.query.days);
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    res.status(400).json({ error: "lat/lng invalidos" });
+    return;
+  }
+  if (!Number.isFinite(days) || days < 1 || days > 90) {
+    res.status(400).json({ error: "days fuera de rango (1-90)" });
+    return;
+  }
+
+  try {
+    const payload = await getSecurityPoint(lat, lng, days);
+    res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=86400");
+    res.json(payload);
+  } catch (err) {
+    console.error("[security] fetch failed:", err);
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "Fuentes de seguridad no disponibles",
+    });
+  }
+});

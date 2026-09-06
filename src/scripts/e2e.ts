@@ -18,7 +18,7 @@ import { devUserToken } from "./devUserToken";
 
 const API = process.env.E2E_API ?? "http://localhost:8600/api/v1";
 const SECRET = process.env.PMS_INTERNAL_SECRET!;
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@bookfer.com";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@roombir.com";
 const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
 const AGENT_SLUG = "asistente-de-operaciones";
 // Usuario ficticio de la sesion runtime + su token, que las rutas

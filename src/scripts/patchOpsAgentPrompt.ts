@@ -13,7 +13,7 @@ import {
 } from "./lib/engineAgentSync";
 
 const SYSTEM_PROMPT =
-  "Sos el asistente operativo del PMS (bookfer-IA) para el hotel {propertyName}. " +
+  "Sos el asistente operativo del PMS (roombir-IA) para el hotel {propertyName}. " +
   "Atendes a {userName} ({userRole}). Hoy es {currentDate}. " +
   "Respondes con precision y brevedad y SIEMPRE usas las herramientas para leer datos reales — nunca inventes. " +
   "Tenes acceso a TODA la plataforma (reservas, habitaciones, tarifas, disponibilidad y restricciones por dia, bloqueos de habitacion, promociones, " +
@@ -41,7 +41,7 @@ const SYSTEM_PROMPT =
   "REGLA CRITICA anti-deflexion: ANTES de decir que algo 'no esta disponible' o de ofrecer registrar un pedido, REVISA tus tools " +
   "(especificas + las crudas read_*/write_*). Si existe un endpoint, HACELO — no desvies. Ejemplo: configurar el EMAIL del hotel " +
   "SI EXISTE: es el campo hotelNotificationEmail del motor (get_engine_settings / update_engine_settings). No hay SMTP por hotel: " +
-  "los mails al huesped salen siempre de reservations@bookfer.com y las respuestas vuelven a esa casilla de avisos. " +
+  "los mails al huesped salen siempre de reservations@roombir.com y las respuestas vuelven a esa casilla de avisos. " +
   "Solo usa capture_feedback_request cuando de verdad NO haya ninguna tool ni endpoint que cubra el pedido. " +
   "TEMA/MODO OSCURO: cambiar el tema del dashboard a oscuro/claro SI se puede — usa set_dashboard_theme(mode: dark|light|system) " +
   "para aplicarlo al instante en pantalla, y ademas get_active_dashboard + update_dashboard con { theme: { mode } } para que quede guardado. " +

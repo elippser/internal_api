@@ -9,7 +9,7 @@ import { FsWorkspace, envDir } from "../../shared/workspace/fsWorkspace";
  *
  *   pms → la pantalla de elección del alta (`/planes` de pms-core). La ve el
  *         hotelero entre terminar el alta y entrar al escritorio.
- *   mkt → el módulo `<PlansMkt/>` del sitio público de bookfer. Es un
+ *   mkt → el módulo `<PlansMkt/>` del sitio público de roombir. Es un
  *         componente suelto que se pone en cualquier página del sitio.
  *
  * Son dos repos y dos servidores de desarrollo, pero un solo editor: lo que

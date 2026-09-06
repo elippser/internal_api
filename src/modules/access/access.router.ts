@@ -5,7 +5,7 @@ import { accessController } from "./access.controller";
 import { blocksController } from "./blocks.controller";
 
 /**
- * `/api/v1/access/*` — quién entró a Bookfer, desde dónde y con qué equipo.
+ * `/api/v1/access/*` — quién entró a roombir, desde dónde y con qué equipo.
  *
  * El piso es `analyst` y no `support`: estas rutas devuelven IP, ubicación y
  * huella del equipo, que son datos personales sensibles (USERS-ACTIONS-SPEC

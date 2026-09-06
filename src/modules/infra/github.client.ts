@@ -1,13 +1,13 @@
 /**
  * Cliente de la REST API de GitHub, acotado a LECTURA.
  *
- * Cada app del stack es su PROPIO repositorio en la organizacion `Bookfer`
+ * Cada app del stack es su PROPIO repositorio en la organizacion `roombir`
  * (no es un monorepo con submodulos: son 17 repos sueltos). Eso hace que la
  * pregunta "que hay desplegado" no se pueda contestar sin GitHub: Vercel dice
  * que commit publico, y GitHub dice cuantos commits quedaron atras.
  *
  * CREDENCIAL: un Personal Access Token en https://github.com/settings/tokens.
- *   - Fine-grained: acceso a los repos de la org `Bookfer`, permisos
+ *   - Fine-grained: acceso a los repos de la org `roombir`, permisos
  *     `Contents: Read-only`, `Metadata: Read-only`, `Pull requests: Read-only`.
  *   - Classic: alcanza con el scope `repo` (los repos son privados).
  *
@@ -60,7 +60,7 @@ function token(): string | null {
 
 /** La organizacion (o usuario) duenio de los repos del stack. */
 export function owner(): string {
-  return process.env.GITHUB_OWNER?.trim() || "Bookfer";
+  return process.env.GITHUB_OWNER?.trim() || "roombir";
 }
 
 export function isConfigured(): boolean {
@@ -142,7 +142,7 @@ async function request<T>(path: string): Promise<T> {
 // ---------------------------------------------------------------------------
 
 export interface GhRepo {
-  /** `Bookfer/core-app-app`. Es la clave con la que se cruza el inventario. */
+  /** `roombir/core-app-app`. Es la clave con la que se cruza el inventario. */
   fullName: string;
   name: string;
   owner: string;

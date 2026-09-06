@@ -95,7 +95,7 @@ async function resolveZone(): Promise<{ id: string; name: string }> {
 // Normalizacion y guardarrailes
 // ---------------------------------------------------------------------------
 
-/** `app` → `app.bookfer.com`; `@` o "" → `bookfer.com`; FQDN se deja igual. */
+/** `app` → `app.roombir.com`; `@` o "" → `roombir.com`; FQDN se deja igual. */
 function normalizeName(raw: string, zone: string): string {
   const n = raw.trim().replace(/\.$/, "").toLowerCase();
   if (n === "" || n === "@") return zone;
@@ -104,7 +104,7 @@ function normalizeName(raw: string, zone: string): string {
   return `${n}.${zone}`;
 }
 
-/** `app.bookfer.com` → `app`; la zona sola → `@`. */
+/** `app.roombir.com` → `app`; la zona sola → `@`. */
 function toHost(name: string, zone: string): string {
   const n = name.toLowerCase();
   if (n === zone) return "@";

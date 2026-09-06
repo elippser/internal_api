@@ -98,7 +98,7 @@ async function run(): Promise<void> {
 
   console.log("→ rollup y API");
   const token = jwt.sign(
-    { userId: "smoke", email: "smoke@bookfer.com", role: "super_admin" },
+    { userId: "smoke", email: "smoke@roombir.com", role: "super_admin" },
     process.env.JWT_SECRET as string,
     { expiresIn: "5m" },
   );

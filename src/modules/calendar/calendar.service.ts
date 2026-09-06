@@ -180,7 +180,7 @@ async function resolveCountry(lat: number, lng: number) {
     }>(
       `${NOMINATIM_BASE}?lat=${lat}&lon=${lng}&format=json&zoom=5&addressdetails=1`,
       {
-        headers: { "user-agent": "bookfer-internal-calendar-hub/1.0" },
+        headers: { "user-agent": "roombir-internal-calendar-hub/1.0" },
         timeoutMs: 12_000,
         retries: 1,
       },

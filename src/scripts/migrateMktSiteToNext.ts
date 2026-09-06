@@ -31,7 +31,7 @@ import { mktprojectService, normalizeRoute } from "../modules/mktproject/mktproj
  *   npm run migrate:mkt-next -- --dry   # solo muestra qué haría
  */
 
-const SITE_SLUG = process.env.MKT_SITE_SLUG ?? "bookfer";
+const SITE_SLUG = process.env.MKT_SITE_SLUG ?? "roombir";
 const DRY = process.argv.includes("--dry");
 const ROOT = mktprojectService.root;
 

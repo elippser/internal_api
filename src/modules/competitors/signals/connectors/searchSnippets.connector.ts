@@ -25,7 +25,7 @@ import {
 const SNIPPET_NETWORKS: SocialNetwork[] = ["instagram", "linkedin", "x", "facebook", "tiktok"];
 
 const SYSTEM =
-  "Sos el rastreador de presencia social y prensa de un competidor de bookfer (software hotelero). " +
+  "Sos el rastreador de presencia social y prensa de un competidor de Roombir (software hotelero). " +
   "Con la búsqueda web, buscá los perfiles OFICIALES del producto/empresa en Instagram, LinkedIn, X/Twitter, Facebook y TikTok " +
   "(por ejemplo `\"<nombre>\" instagram`, `\"<nombre>\" linkedin`) y leé los números que aparecen en los snippets de los resultados " +
   '("12.3K Followers, 480 Posts", "1,234 followers on LinkedIn"). También buscá noticias de los últimos 30 días ' +

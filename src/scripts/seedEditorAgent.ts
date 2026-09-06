@@ -7,7 +7,7 @@ import { AgentDefinition } from "../modules/agents/agents.model";
 import { InternalUser } from "../modules/users/users.model";
 
 // Slug canonico del agente del editor. DEBE coincidir con
-// bookfer_EDITOR_AGENT_SLUG en pms-core/api (el reporter usa este slug al
+// ROOMBIR_EDITOR_AGENT_SLUG en pms-core/api (el reporter usa este slug al
 // reportar consumo a /usage/records).
 const EDITOR_AGENT_SLUG = "asistente-del-editor";
 
@@ -36,7 +36,7 @@ async function run() {
       "/usage/records.",
     status: "active",
     persona: {
-      displayName: "bookfer IA",
+      displayName: "Roombir IA",
       tone: "friendly",
       language: "es",
       personality:

@@ -22,7 +22,7 @@ export const signalsModel = () => process.env.CI_SIGNALS_MODEL ?? process.env.CI
 const featureCatalogText = FEATURE_CATALOG.map((f) => `${f.key} (${f.label})`).join(", ");
 
 const CONTENT_EVENT_SYSTEM =
-  "Sos un analista de competencia de bookfer (PMS + motor de reservas para alojamientos chicos en LATAM). " +
+  "Sos un analista de competencia de Roombir (PMS + motor de reservas para alojamientos chicos en LATAM). " +
   "Te paso un contenido publicado por un competidor (post de blog, nota de changelog, notas de una versión de app, cambio en una página). " +
   'Devolvé SOLO JSON: {"kind":"launch"|"feature_announce"|"pricing_change"|"page_change"|"funding"|"press"|"hiring_spike"|"other",' +
   '"severity":"low"|"medium"|"high","summary":string (1-2 líneas, español, qué cambió y por qué importa),' +

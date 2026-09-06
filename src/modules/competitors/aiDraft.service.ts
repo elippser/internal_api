@@ -85,7 +85,7 @@ function draftSystem(mode: "text" | "search"): string {
       ? "Te paso el texto de la home y de la página de precios de un software hotelero competidor."
       : "No tengo el texto del sitio del competidor (es una app sin render server-side). Usá la búsqueda web (por ejemplo `site:<dominio> pricing`, `<nombre> PMS hotel precios`) para reconstruir lo que puedas.";
   return (
-    "Sos un analista de producto de bookfer (PMS + motor de reservas para alojamientos chicos en LATAM). " +
+    "Sos un analista de producto de Roombir (PMS + motor de reservas para alojamientos chicos en LATAM). " +
     `${intro} ` +
     `Devolvé SOLO un JSON con esta forma (sin texto extra): ${DRAFT_JSON_SHAPE}. ` +
     `Catálogo de features: ${featureCatalogText}. Catálogo de tipos de producto: ${PRODUCT_TYPES.join(", ")}. Catálogo de temas de debilidad: ${weaknessThemesText}. ` +

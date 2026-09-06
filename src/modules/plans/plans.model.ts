@@ -7,7 +7,7 @@ export const PRODUCT_STATUSES = ["active", "archived"] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
 /**
- * Un producto del full system (Habitaciones, Revenue, Sitios web, Bookfer IA…).
+ * Un producto del full system (Habitaciones, Revenue, Sitios web, Roombir IA…).
  *
  * Es la pieza que un plan incluye o no. Vive en Mongo y no en una constante
  * de TypeScript a proposito: lanzar un producto nuevo o renombrar uno no
@@ -84,7 +84,7 @@ const limitsSchema = new Schema(
   {
     maxProperties: { type: Number, default: null },
     maxUsers: { type: Number, default: null },
-    // Creditos (tokens) de Bookfer IA por mes. Es el cupo REAL y el unico:
+    // Creditos (tokens) de Roombir IA por mes. Es el cupo REAL y el unico:
     // el gate del chat lo lee de aca (planCredits.service). Antes el enforcement
     // vivia en un modulo `contracts` aparte, que se elimino al fusionar los dos
     // conceptos — un plan decia que productos veias y un contrato si tenias IA,

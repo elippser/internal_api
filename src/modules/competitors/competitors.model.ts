@@ -1,7 +1,7 @@
 import { Schema, model } from "mongoose";
 
 /**
- * Inteligencia competitiva de bookfer (COMPETITIVE-INTEL-SPEC.md + -V2.md).
+ * Inteligencia competitiva de Roombir (COMPETITIVE-INTEL-SPEC.md + -V2.md).
  * Tier 1 = battle set curado (`ci_competitors`); Tier 2 = radar
  * (`ci_radar_items`). v2 agrega procedencia por campo (`meta`), pricing
  * estructurado, taxonomia, perfiles sociales, paginas vigiladas, senales y

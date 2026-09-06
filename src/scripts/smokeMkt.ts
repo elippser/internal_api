@@ -21,10 +21,10 @@ async function main() {
   }
 
   console.log("\n=== 2. Sitio + pagina + publicacion ===");
-  let site = (await mktsiteService.listSites()).find((s: any) => s.slug === "bookfer");
+  let site = (await mktsiteService.listSites()).find((s: any) => s.slug === "roombir");
   if (!site) {
     site = await mktsiteService.createSite(
-      { name: "Bookfer", slug: "bookfer", status: "published" },
+      { name: "roombir", slug: "roombir", status: "published" },
       "smoke",
     );
     console.log("  sitio creado");
@@ -35,9 +35,9 @@ async function main() {
   const home = (full as any).pages.find((p: any) => p.path === "/");
   await mktsiteService.publishPage(home.pageId);
 
-  const publicHtml = await mktsiteService.renderPage("bookfer", "/");
+  const publicHtml = await mktsiteService.renderPage("roombir", "/");
   console.log(`  render publico: ${publicHtml.length} bytes, <title> presente: ${publicHtml.includes("<title>")}`);
-  const previewHtml = await mktsiteService.renderPage("bookfer", "/", true);
+  const previewHtml = await mktsiteService.renderPage("roombir", "/", true);
   console.log(`  preview lleva noindex: ${previewHtml.includes("noindex")}`);
 
   console.log("\n=== 3. Captura de lead desde el sitio ===");

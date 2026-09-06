@@ -13,7 +13,7 @@ const SERVICE_ENV: Record<TargetService, string> = {
   // email. Sus rutas internas van con X-Internal-Secret; ya no expone endpoints
   // de staff (la config SMTP por hotel se elimino).
   staypass: "STAYPASS_API_URL",
-  // rms-app: Hub Revenue (DB propia bookfer_rms). Su authenticateStaff ya acepta
+  // rms-app: Hub Revenue (DB propia roombir_rms). Su authenticateStaff ya acepta
   // AGENT_JWT_SECRET, asi que el JWT delegado funciona igual que en los otros 3.
   "rms-app": "RMS_API_URL",
 };

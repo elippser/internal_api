@@ -40,7 +40,7 @@ export const TARGET_SERVICES = [
   "analytics",
   // staypass (public-side): huespedes y confirmaciones de reserva por email.
   "staypass",
-  // rms-app: Hub Revenue. DB propia (bookfer_rms) y espacio operativo "revenue".
+  // rms-app: Hub Revenue. DB propia (roombir_rms) y espacio operativo "revenue".
   "rms-app",
 ] as const;
 
@@ -172,7 +172,7 @@ const WRITE_ROLES = ["owner", "admin", "staff"];
 const CONFIG_ROLES = ["owner", "admin"];
 const OWNER_ROLES = ["owner"];
 
-// Catalogo completo de tools del agente de operaciones (bookfer-IA). Expone
+// Catalogo completo de tools del agente de operaciones (roombir-IA). Expone
 // TODAS las funcionalidades operables de la plataforma, alineadas 1:1 con el menu
 // del PMS:
 //   - Inicio (dashboards/widgets de cada espacio operativo)
@@ -521,7 +521,7 @@ export const INITIAL_TOOLS = [
       "Actualiza la configuracion del motor de reservas. Accion sensible. " +
       "Aca vive el EMAIL DE AVISOS del hotel (hotelNotificationEmail): la casilla que recibe el aviso de cada reserva nueva " +
       "y a la que le llegan las respuestas del huesped. No hay SMTP por hotel: los mails al huesped salen siempre de " +
-      "reservations@bookfer.com. Si piden 'configurar el email del hotel', es esta tool.",
+      "reservations@roombir.com. Si piden 'configurar el email del hotel', es esta tool.",
     inputSchema: obj({
       ...PROPERTY_PARAM,
       hotelNotificationEmail: { type: "string", description: "Casilla del hotel que recibe los avisos de reserva nueva y las respuestas del huesped." },
@@ -2247,7 +2247,7 @@ export const INITIAL_TOOLS = [
   {
     toolId: "tool-319",
     name: "get_compset_rates",
-    displayName: "Tarifas de properties del comp-set (bookfer)",
+    displayName: "Tarifas de properties del comp-set (roombir)",
     category: "revenue_read",
     description:
       "BAR por fecha de properties de LA PLATAFORMA usadas como comp-set (no de competidores externos). property_ids es una lista separada por comas. " +
@@ -2695,7 +2695,7 @@ export const INITIAL_TOOLS = [
     displayName: "Definir el comp-set",
     category: "revenue_write",
     description:
-      "Reemplaza los slots del comp-set (maximo 5). Cada slot es { type: 'bookfer', propertyId } o { type: 'external', externalCompetitorId }, " +
+      "Reemplaza los slots del comp-set (maximo 5). Cada slot es { type: 'roombir', propertyId } o { type: 'external', externalCompetitorId }, " +
       "con `label` opcional. REEMPLAZA la lista entera: incluí tambien los que ya estaban y se quedan. El orden define competitor_1..competitor_5 " +
       "en las reglas, asi que reordenar cambia que compara cada regla.",
     inputSchema: obj({

@@ -34,7 +34,7 @@ function main(): void {
   const pmsIds = parsePmsAppIds(fs.readFileSync(PMS_CATALOG, "utf8"));
   const mine = new Set(APP_IDS);
 
-  // Las superficies públicas (motor, sitio, linkhub, staypass, bookfer-ia) son
+  // Las superficies públicas (motor, sitio, linkhub, staypass, roombir-ia) son
   // propias de métricas: no están en OS_APP_IDS y no deben reclamarse como falta.
   const extra = new Set(
     APP_IDS.filter((a) => !HUBS.some((h) => h.apps.includes(a))),

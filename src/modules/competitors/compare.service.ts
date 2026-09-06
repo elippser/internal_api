@@ -12,7 +12,7 @@ import { ensureV2 } from "./migration";
 import { getSettings } from "./settings.service";
 
 /**
- * Comparador lado a lado (v2.1): 2-4 competidores contra bookfer en una sola
+ * Comparador lado a lado (v2.1): 2-4 competidores contra Roombir en una sola
  * tabla, más la serie histórica de precio normalizado. Todo se arma de lo ya
  * cargado; no consulta fuentes externas.
  */
@@ -54,7 +54,7 @@ export async function compareCompetitors(input: CompareInput) {
   }));
   const us = {
     competitorId: "__us__",
-    name: "bookfer",
+    name: "roombir",
     website: "",
     segment: "latam",
     priority: null,

@@ -83,9 +83,9 @@ const PLAN_SEED: SeedPlan[] = [
   {
     slug: "full-system",
     name: "Full System",
-    tagline: "Todo bookfer, incluido revenue management y el asistente de IA",
+    tagline: "Todo roombir, incluido revenue management y el asistente de IA",
     description:
-      "Todos los productos de la plataforma: el núcleo operativo, marketing completo, Revenue (RMS), presencia online y Bookfer IA con créditos mensuales.",
+      "Todos los productos de la plataforma: el núcleo operativo, marketing completo, Revenue (RMS), presencia online y Roombir IA con créditos mensuales.",
     productKeys: [
       "habitaciones",
       "reservas",
@@ -100,7 +100,7 @@ const PLAN_SEED: SeedPlan[] = [
       "social-hub",
       "archivos",
       "staypass",
-      "bookfer-ia",
+      "roombir-ia",
     ],
     price: { amount: 199, currency: "USD", period: "monthly" },
     free: false,

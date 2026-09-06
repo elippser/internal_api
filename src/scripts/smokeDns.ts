@@ -19,7 +19,7 @@ import {
  *   npm run smoke:dns
  */
 
-const ZONE = (process.env.CLOUDFLARE_ZONE_NAME ?? "bookfer.com").trim();
+const ZONE = (process.env.CLOUDFLARE_ZONE_NAME ?? "roombir.com").trim();
 
 function line(char = "─") {
   console.log(char.repeat(64));
@@ -105,7 +105,7 @@ async function main() {
   console.log(
     s.missing + s.proxyMismatch + s.forbidden === 0
       ? "✓ La zona coincide con el inventario del monorepo."
-      : "✗ Hay diferencias contra el inventario — ver arriba y DNS-CLOUDFLARE-BOOKFER.md",
+      : "✗ Hay diferencias contra el inventario — ver arriba y DNS-CLOUDFLARE-roombir.md",
   );
 }
 

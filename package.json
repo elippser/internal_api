@@ -33,6 +33,16 @@
     "test:sports": "ts-node --transpile-only src/scripts/testSports.ts",
     "test:culture": "ts-node --transpile-only src/scripts/testCulture.ts",
     "test:mice": "ts-node --transpile-only src/scripts/testMice.ts",
+    "test:economy": "ts-node --transpile-only src/scripts/testEconomy.ts",
+    "test:connectivity": "ts-node --transpile-only src/scripts/testConnectivity.ts",
+    "test:policy": "ts-node --transpile-only src/scripts/testPolicy.ts",
+    "test:security": "ts-node --transpile-only src/scripts/testSecurity.ts",
+    "test:hazards": "ts-node --transpile-only src/scripts/testHazards.ts",
+    "test:supply": "ts-node --transpile-only src/scripts/testSupply.ts",
+    "test:place": "ts-node --transpile-only src/scripts/testPlace.ts",
+    "test:attention": "ts-node --transpile-only src/scripts/testAttention.ts",
+    "test:institutional": "ts-node --transpile-only src/scripts/testInstitutional.ts",
+    "test:industry": "ts-node --transpile-only src/scripts/testIndustry.ts",
     "test:scrapers": "ts-node --transpile-only src/scripts/testScrapers.ts",
     "fix:unit-company": "ts-node src/scripts/fixUnitCompanyMismatch.ts",
     "patch:ops-prompt": "ts-node src/scripts/patchOpsAgentPrompt.ts",
@@ -48,7 +58,8 @@
     "import:prospects": "ts-node --transpile-only src/scripts/importProspects.ts",
     "smoke:prospects": "ts-node --transpile-only src/scripts/smokeProspects.ts",
     "smoke:dns": "ts-node --transpile-only src/scripts/smokeDns.ts",
-    "smoke:infra": "ts-node --transpile-only src/scripts/smokeInfra.ts"
+    "smoke:infra": "ts-node --transpile-only src/scripts/smokeInfra.ts",
+    "smoke:leads": "ts-node --transpile-only src/scripts/smokeLeads.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

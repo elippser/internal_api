@@ -52,6 +52,11 @@ import {
 import { loyaltyRouter } from "./modules/loyalty/loyalty.router";
 import { competitorsRouter } from "./modules/competitors/competitors.router";
 import { prospectsRouter } from "./modules/prospects/prospects.router";
+import {
+  internalLeadsRouter,
+  leadsRouter,
+  publicLeadsRouter,
+} from "./modules/leads/leads.router";
 import { startRadarCron } from "./modules/competitors/radar/radarCron";
 import { startSignalsCron } from "./modules/competitors/signals/signalsCron";
 import { startMentionDetectorCron } from "./modules/competitors/mentions/mentionDetector";
@@ -61,6 +66,16 @@ import { calendarRouter } from "./modules/calendar/calendar.router";
 import { sportsRouter } from "./modules/sports/sports.router";
 import { cultureRouter } from "./modules/culture/culture.router";
 import { miceRouter } from "./modules/mice/mice.router";
+import { economyRouter } from "./modules/economy/economy.router";
+import { connectivityRouter } from "./modules/connectivity/connectivity.router";
+import { policyRouter } from "./modules/policy/policy.router";
+import { securityRouter } from "./modules/security/security.router";
+import { hazardsRouter } from "./modules/hazards/hazards.router";
+import { supplyRouter } from "./modules/supply/supply.router";
+import { placeRouter } from "./modules/place/place.router";
+import { attentionRouter } from "./modules/attention/attention.router";
+import { institutionalRouter } from "./modules/institutional/institutional.router";
+import { industryRouter } from "./modules/industry/industry.router";
 import { engineRouter } from "./modules/engine/engine.router";
 import { bootstrapEngine, shutdownWorker } from "./engine";
 
@@ -74,22 +89,22 @@ app.use(helmet());
  * Son DOS familias distintas y por eso no alcanza con `WEB_URL`:
  *
  * 1. El panel interno (`WEB_URL`), que manda JWT y necesita `credentials`.
- * 2. El sitio publico de bookfer, que postea el formulario de leads a
+ * 2. El sitio publico de roombir, que postea el formulario de leads a
  *    `POST /public/mkt/leads` desde el browser. Sin esto el LeadForm de
- *    bookfer.com falla en produccion con un error de CORS y el lead se pierde
+ *    roombir.com falla en produccion con un error de CORS y el lead se pierde
  *    en silencio: el `fetch` rechaza y el visitante ve "Error de red".
  *
  * `PUBLIC_SITE_ORIGINS` permite sumar mas (staging, un dominio nuevo) sin
  * tocar codigo. Se separa por comas y se limpia la barra final, porque el
- * header `Origin` nunca la trae y `https://bookfer.com/` no matchearia nunca.
+ * header `Origin` nunca la trae y `https://roombir.com/` no matchearia nunca.
  */
 const trimSlash = (value: string) => value.trim().replace(/\/+$/, "");
 
 const CORS_ORIGINS = new Set(
   [
     process.env.WEB_URL ?? "http://localhost:8500",
-    "https://bookfer.com",
-    "https://www.bookfer.com",
+    "https://roombir.com",
+    "https://www.roombir.com",
     "http://localhost:6300",
     ...(process.env.PUBLIC_SITE_ORIGINS ?? "").split(","),
   ]
@@ -156,9 +171,9 @@ app.use(`${BASE}/campaigns`, campaignsRouter);
 // las conversiones y la captura de leads, que siguen viviendo en la DB.
 app.use(`${BASE}/mkt/project`, mktprojectRouter);
 app.use(`${BASE}/mkt/site`, mktsiteRouter);
-// DNS de bookfer.com en Cloudflare. Vive bajo /mkt porque el dominio es del
+// DNS de roombir.com en Cloudflare. Vive bajo /mkt porque el dominio es del
 // sitio publico, pero lo que administra es la zona entera de la plataforma:
-// los 17 hostnames de DNS-CLOUDFLARE-BOOKFER.md salen de los .env.production.
+// los 17 hostnames de DNS-CLOUDFLARE-roombir.md salen de los .env.production.
 app.use(`${BASE}/mkt/dns`, dnsRouter);
 // Infraestructura: que servicio del stack corre en que proveedor y con que
 // deploy. Prefijo propio y no bajo /mkt como DNS — la zona es del dominio del
@@ -167,7 +182,7 @@ app.use(`${BASE}/infra`, infraRouter);
 app.use(`${BASE}/reputation`, reputationRouter);
 app.use(`${BASE}/loyalty`, loyaltyRouter);
 
-// Inteligencia competitiva de bookfer: battle set (Tier 1) + radar (Tier 2).
+// Inteligencia competitiva de roombir: battle set (Tier 1) + radar (Tier 2).
 // Ver COMPETITIVE-INTEL-SPEC.md.
 app.use(`${BASE}/competitors`, competitorsRouter);
 
@@ -175,16 +190,27 @@ app.use(`${BASE}/competitors`, competitorsRouter);
 // recorrido comercial (todavia no hay conversacion, asi que no hay cuenta).
 app.use(`${BASE}/prospects`, prospectsRouter);
 
+// Leads: quien pidio acceso desde el sitio publico. Es la UNICA puerta de alta
+// de la plataforma — el /register del PMS no crea nada sin un invite emitido
+// aca. /leads/internal/* va montado aparte porque no lleva JWT de operador
+// sino X-Internal-Secret: quien pregunta es pms-core, no una persona.
+app.use(`${BASE}/leads/internal`, internalLeadsRouter);
+app.use(`${BASE}/leads`, leadsRouter);
+
 // Motor agéntico. Prefijo propio a proposito: /agents y /conversations siguen
 // sirviendo al runtime actual del chat del PMS sin un solo cambio, y los dos
 // agentes existentes se migran cuando el motor este validado con trafico real.
 app.use(`${BASE}/engine`, engineRouter);
 
-// Superficie publica del hub de marketing: el sitio de bookfer, el formulario
+// Superficie publica del hub de marketing: el sitio de roombir, el formulario
 // de captura y la encuesta NPS. Van fuera de /api/v1 porque no llevan JWT y las
 // consume gente de afuera (o Google, al indexar el sitio).
 app.use("/public/mkt/leads", publicLeadRouter);
-// El catalogo de planes que pinta <PlansMkt/> en el sitio de bookfer.
+// El formulario de alta de roombir.com (/crear-cuenta y sus cinco slugs). Es
+// otra cosa que /public/mkt/leads: aquel captura una consulta comercial, este
+// emite el acceso al PMS. Ver modules/leads.
+app.use("/public/leads", publicLeadsRouter);
+// El catalogo de planes que pinta <PlansMkt/> en el sitio de roombir.
 app.use("/public/plans", publicPlansRouter);
 app.use("/public/mkt/nps", publicNpsRouter);
 app.use("/s", publicSiteRouter);
@@ -201,6 +227,16 @@ app.use("/api/global/calendar", globalHubCors, calendarRouter);
 app.use("/api/global/sports", globalHubCors, sportsRouter);
 app.use("/api/global/culture", globalHubCors, cultureRouter);
 app.use("/api/global/mice", globalHubCors, miceRouter);
+app.use("/api/global/economy", globalHubCors, economyRouter);
+app.use("/api/global/connectivity", globalHubCors, connectivityRouter);
+app.use("/api/global/policy", globalHubCors, policyRouter);
+app.use("/api/global/security", globalHubCors, securityRouter);
+app.use("/api/global/hazards", globalHubCors, hazardsRouter);
+app.use("/api/global/supply", globalHubCors, supplyRouter);
+app.use("/api/global/place", globalHubCors, placeRouter);
+app.use("/api/global/attention", globalHubCors, attentionRouter);
+app.use("/api/global/institutional", globalHubCors, institutionalRouter);
+app.use("/api/global/industry", globalHubCors, industryRouter);
 
 // Feeds de elippser para la vista /global. Van fuera de /api/v1 porque son
 // los route handlers portados tal cual desde elippser-gl y conservan sus

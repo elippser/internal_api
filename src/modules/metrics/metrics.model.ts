@@ -110,7 +110,7 @@ const metricsDailySchema = new Schema(
     /** Días sin avanzar: separa "en curso" de "abandonado". */
     ob_state_dormant_days: { type: Number, default: null },
 
-    // ── Bookfer IA ───────────────────────────────────────────────────────
+    // ── Roombir IA ───────────────────────────────────────────────────────
     ia_sessions: num,
     ia_turns: num,
     ia_users: num,

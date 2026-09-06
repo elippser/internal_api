@@ -1,4 +1,4 @@
-// Router de tareas de bookfer-IA.
+// Router de tareas de roombir-IA.
 //
 // Decide, por turno y dentro del mismo chat, a que sub-agente delegar (ver
 // subAgents.ts). Estrategia en dos pasos, barata y robusta:

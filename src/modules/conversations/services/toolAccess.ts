@@ -24,7 +24,7 @@ import {
 } from "../../../shared/agentAuth/pmsAccessCatalog";
 
 /**
- * Acceso por herramienta para el runtime del chat (bookfer-IA).
+ * Acceso por herramienta para el runtime del chat (roombir-IA).
  *
  * Une el catálogo de tools (qué endpoint pega cada una) con la política de
  * rutas (`routePolicy`) y el alcance del usuario (`userScope`) para responder,

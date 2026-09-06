@@ -93,8 +93,8 @@ export const DEFAULT_EXCLUDED_DOMAINS: string[] = [
 
 // Dominios propios: nunca son candidatos del radar. pxsol.com aparecio como
 // "entrante" en la primera corrida real (es el dominio del equipo).
-export const DEFAULT_OUR_DOMAINS: string[] = ["bookfer.com", "elippser.com", "pxsol.com"];
-export const DEFAULT_OUR_ALIASES: string[] = ["bookfer", "elippser", "laupser", "pxsol"];
+export const DEFAULT_OUR_DOMAINS: string[] = ["roombir.com", "elippser.com", "pxsol.com"];
+export const DEFAULT_OUR_ALIASES: string[] = ["roombir", "elippser", "laupser", "pxsol"];
 
 export const DEFAULT_ICP = {
   productTypes: ["pms", "booking_engine", "website_builder"],

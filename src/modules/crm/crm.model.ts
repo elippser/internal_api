@@ -1,10 +1,10 @@
 import { Schema, model, type InferSchemaType } from "mongoose";
 
 /**
- * CRM B2B de bookfer: los "contactos" son hoteles prospecto y clientes, no
+ * CRM B2B de roombir: los "contactos" son hoteles prospecto y clientes, no
  * huespedes. Ver `internal-laupser/MKT-HUB-SPEC.md`.
  *
- * No hay multi-tenancy: bookfer es el unico tenant. `companyId` aparece como
+ * No hay multi-tenancy: Roombir es el unico tenant. `companyId` aparece como
  * REFERENCIA a la company del PMS cuando la cuenta ya convirtio, no como
  * discriminador de aislamiento.
  */
