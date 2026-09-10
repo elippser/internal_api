@@ -61,6 +61,18 @@ signalSchema.index({ type: 1, "scope.geo.airportCode": 1, "timeWindow.start": -1
 signalSchema.index({ type: 1, "scope.geo.countryCode": 1, "timeWindow.start": -1 });
 signalSchema.index({ source: 1, ingestedAt: -1 });
 
+// Poda automatica. La coleccion no tenia TTL ni purga alguna y el cron de
+// `events` corre diario y COMPLETO, asi que solo acumulaba: 174k señales /
+// 184 MB en cuatro semanas de cluster nuevo, el 90% de un M0. Con esto una
+// señal se borra sola `SIGNAL_TTL_DAYS` despues de que termino su ventana.
+// Mongo compara `timeWindow.end` contra ahora, no contra `ingestedAt`: las
+// señales de ventana futura (el caso normal) no expiran nunca, y las de
+// eventos ya pasados — el 43% del volumen — se van solas.
+// El TTL tiene que ser indice de UN campo, por eso no se cuelga de los
+// compuestos de arriba.
+const SIGNAL_TTL_DAYS = Number(process.env.IH_SIGNAL_TTL_DAYS || 90);
+signalSchema.index({ "timeWindow.end": 1 }, { expireAfterSeconds: SIGNAL_TTL_DAYS * 86400 });
+
 export type SignalDoc = InferSchemaType<typeof signalSchema>;
 export const SignalModel = model("IhSignal", signalSchema);
 
@@ -81,6 +93,11 @@ const connectorRunSchema = new Schema(
 );
 
 connectorRunSchema.index({ connector: 1, startedAt: -1 });
+
+// `getHealth` solo lee la ULTIMA corrida de cada connector y el cron mas lento
+// es mensual (venues, lodging, str-supply), asi que 90 dias dejan margen de
+// sobra. Sin esto los logs tambien crecian sin techo (3.540 docs / 4,3 MB).
+connectorRunSchema.index({ startedAt: 1 }, { expireAfterSeconds: 90 * 86400 });
 
 export type ConnectorRunDoc = InferSchemaType<typeof connectorRunSchema>;
 export const ConnectorRunModel = model("IhConnectorRun", connectorRunSchema);
