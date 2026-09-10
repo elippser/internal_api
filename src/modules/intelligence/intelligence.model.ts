@@ -28,9 +28,15 @@ const geoSchema = new Schema(
 
 const signalSchema = new Schema(
   {
-    signalId: { type: String, required: true, index: true }, // uuid v4 del connector
-    type: { type: String, enum: SIGNAL_TYPES, required: true, index: true },
-    source: { type: String, required: true, index: true },
+    // Sin `index: true` en estos tres, a proposito. La coleccion pasa las
+    // 170k señales y sus indices llegaron a pesar MAS que los datos (111MB de
+    // indices sobre 113MB de documentos). Los tres que estaban aca no aportaban
+    // nada: `signalId` no se consulta en ningun lado del codigo, y `type` y
+    // `source` sueltos son prefijo de los compuestos declarados mas abajo, que
+    // ya sirven esas consultas. Volver a agregarlos cuesta ~44MB.
+    signalId: { type: String, required: true }, // uuid v4 del connector
+    type: { type: String, enum: SIGNAL_TYPES, required: true },
+    source: { type: String, required: true },
     scope: {
       geo: { type: geoSchema, default: () => ({}) },
       radiusKm: { type: Number },
