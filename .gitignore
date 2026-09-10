@@ -7,3 +7,6 @@ dist
 
 # Secretos de produccion: nunca al repo (ver .env.production).
 .env.production
+
+# Salida de `npm run mail:preview` (HTML de los correos para mirarlos)
+.mail-preview/

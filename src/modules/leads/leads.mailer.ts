@@ -5,18 +5,31 @@
  * nadie puede crear una cuenta. Por eso el envio NO es fire-and-forget — si
  * falla, el lead queda con `invite.lastError` y el panel puede reintentarlo.
  *
- * Va por Resend con `fetch` y no con el SDK a proposito: `internal-laupser/api`
- * no tiene la dependencia y no vale la pena sumarla por un POST de tres campos.
- * El mismo criterio que `campaigns/providers.ts`, que ya manda asi.
+ * Este archivo es SOLO el transporte. El HTML vive en `leads.template.ts`.
  *
- * Sin `RESEND_API_KEY` el driver es `log`: escribe el enlace en la consola y
- * devuelve exito. En local eso es lo que permite probar el circuito entero sin
- * dominio verificado ni cuenta; en produccion, que falte la clave se ve en el
- * panel porque el lead queda `invited` con el error del envio.
+ * ---------------------------------------------------------------------------
+ * Por que hay tres drivers y en que orden se eligen
+ * ---------------------------------------------------------------------------
+ *
+ *   1. `smtp`   — nodemailer contra las `SMTP_*`. Es el camino normal.
+ *   2. `resend` — la API HTTP, si quedo una `RESEND_API_KEY` y no hay SMTP.
+ *                 Se mantiene porque hay hostings que bloquean los puertos de
+ *                 salida 465/587: si eso pasa en el VPS, esto sigue mandando.
+ *   3. `log`    — escribe el enlace en consola. SOLO fuera de produccion.
+ *
+ * El punto 3 es el que hay que mirar con cuidado, porque su version anterior
+ * fue exactamente el bug que dejo el alta muda durante semanas: el driver `log`
+ * se activaba por la sola ausencia de `RESEND_API_KEY`, tambien en produccion,
+ * y devolvia EXITO. El lead quedaba `invited`, sin `lastError`, con el panel
+ * mostrando todo en verde y ningun correo enviado. Ahora en produccion la falta
+ * de configuracion tira: es preferible un lead con error visible y un boton de
+ * reintentar que uno que miente.
  */
 
-import type { Locale } from "./leads.i18n";
-import { emailCopy, resolveLocale } from "./leads.i18n";
+import nodemailer, { type Transporter } from "nodemailer";
+
+import { resolveLocale } from "./leads.i18n";
+import { renderExisting, renderInvite, type RenderedMail } from "./leads.template";
 
 export interface InviteMailInput {
   to: string;
@@ -28,149 +41,142 @@ export interface InviteMailInput {
   expiresAt: Date;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+type Driver = "smtp" | "resend" | "log";
 
+// ---------------------------------------------------------------------------
+// Configuracion
+// ---------------------------------------------------------------------------
+
+/**
+ * El remitente.
+ *
+ * `SMTP_FROM` va primero y es el mismo nombre en los cuatro servicios: con
+ * Gmail el From tiene que ser la casilla autenticada (o un alias verificado en
+ * esa cuenta), asi que la direccion del camino SMTP se declara aparte de la que
+ * usaria Resend. Si no coincide, Google reescribe la cabecera sin avisar.
+ */
 function fromAddress(): string {
   return (
+    process.env.SMTP_FROM ||
     process.env.LEADS_EMAIL_FROM ||
     process.env.EMAIL_FROM ||
-    "Roombir <hola@roombir.com>"
+    "Roombir <team@roombir.com>"
   );
 }
 
-/** Cuantos dias faltan para que venza, redondeado hacia arriba. */
-function daysLeft(expiresAt: Date): number {
-  return Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000));
-}
-
-// ---------------------------------------------------------------------------
-// Plantilla
-// ---------------------------------------------------------------------------
-
-/**
- * HTML de correo, no de pagina: tablas, estilos en linea y nada de CSS externo.
- * Gmail y Outlook descartan `<style>` y `class` sin avisar.
- *
- * El enlace va ademas como texto plano debajo del boton: hay clientes que no
- * pintan el boton, y un alta que depende de un enlace no puede quedarse sin el.
- */
-function renderInvite(input: InviteMailInput, locale: Locale) {
-  const copy = emailCopy(locale).invite;
-  const days = daysLeft(input.expiresAt);
-  const greet = input.contactName
-    ? copy.greetNamed(escapeHtml(input.contactName.split(" ")[0]))
-    : copy.greet;
-  const hotel = escapeHtml(input.hotelName);
-  const url = input.url;
-
-  const html = `<!doctype html>
-<html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.subject)}</title></head>
-<body style="margin:0;padding:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
-<div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;color:#f6f7f9;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(copy.preheader)}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f6f7f9;padding:32px 16px;"><tr><td align="center">
-<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;overflow:hidden;">
-<tr><td style="padding:26px 32px 0 32px;">
-<p style="margin:0;font-size:19px;font-weight:600;letter-spacing:-0.01em;color:#18181b;">roombir</p>
-<p style="margin:2px 0 0 0;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#71717a;">${escapeHtml(copy.eyebrow)}</p>
-</td></tr>
-<tr><td style="padding:22px 32px 0 32px;">
-<h1 style="margin:0 0 14px 0;font-size:22px;line-height:1.3;font-weight:600;color:#09090b;">${escapeHtml(copy.title)}</h1>
-<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#3f3f46;">${escapeHtml(greet)}</p>
-<p style="margin:0 0 22px 0;font-size:15px;line-height:1.6;color:#3f3f46;">${copy.body(`<strong>${hotel}</strong>`)}</p>
-</td></tr>
-<tr><td style="padding:0 32px;">
-<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#18181b;">
-<a href="${url}" style="display:inline-block;padding:14px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">${escapeHtml(copy.cta)}</a>
-</td></tr></table>
-</td></tr>
-<tr><td style="padding:18px 32px 0 32px;">
-<p style="margin:0 0 6px 0;font-size:12.5px;line-height:1.5;color:#71717a;">${escapeHtml(copy.fallback)}</p>
-<p style="margin:0;font-size:12.5px;line-height:1.5;word-break:break-all;"><a href="${url}" style="color:#4f46e5;text-decoration:underline;">${escapeHtml(url)}</a></p>
-</td></tr>
-<tr><td style="padding:22px 32px 28px 32px;">
-<div style="border-top:1px solid #e4e4e7;padding-top:16px;">
-<p style="margin:0 0 6px 0;font-size:12.5px;line-height:1.6;color:#71717a;">${escapeHtml(copy.expires(days))}</p>
-<p style="margin:0;font-size:12.5px;line-height:1.6;color:#a1a1aa;">${escapeHtml(copy.ignore)}</p>
-</div>
-</td></tr>
-</table>
-<p style="margin:16px 0 0 0;font-size:11.5px;color:#a1a1aa;">${escapeHtml(copy.footer)}</p>
-</td></tr></table></body></html>`;
-
-  const text = [
-    greet,
-    "",
-    copy.bodyText(input.hotelName),
-    "",
-    url,
-    "",
-    copy.expires(days),
-    copy.ignore,
-  ].join("\n");
-
-  return { subject: copy.subject, html, text };
+interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
 }
 
 /**
- * El otro correo: alguien que YA tiene cuenta vuelve a pedir acceso.
+ * Las `SMTP_*`, o `null` si falta alguna.
  *
- * Existe para no tener que contestarle al formulario "ese email ya existe": eso
- * convierte el alta en un oraculo para saber que hoteles ya son clientes. El
- * sitio siempre dice lo mismo ("mira tu correo") y la diferencia viaja en el
- * mail, que solo puede leer el dueno de la casilla.
+ * Se exige host + user + pass juntos a proposito: un host sin credenciales no
+ * es "SMTP a medio configurar", es una configuracion que va a fallar en el
+ * primer envio. Mejor que ni siquiera se elija ese driver.
  */
-function renderExisting(input: { hotelName: string; loginUrl: string }, locale: Locale) {
-  const copy = emailCopy(locale).existing;
-  const html = `<!doctype html>
-<html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.subject)}</title></head>
-<body style="margin:0;padding:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
-<div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;color:#f6f7f9;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(copy.preheader)}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f6f7f9;padding:32px 16px;"><tr><td align="center">
-<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;">
-<tr><td style="padding:26px 32px 0 32px;">
-<p style="margin:0;font-size:19px;font-weight:600;color:#18181b;">roombir</p>
-</td></tr>
-<tr><td style="padding:18px 32px 26px 32px;">
-<h1 style="margin:0 0 14px 0;font-size:21px;line-height:1.3;font-weight:600;color:#09090b;">${escapeHtml(copy.title)}</h1>
-<p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#3f3f46;">${escapeHtml(copy.body)}</p>
-<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#18181b;">
-<a href="${input.loginUrl}" style="display:inline-block;padding:13px 24px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">${escapeHtml(copy.cta)}</a>
-</td></tr></table>
-<p style="margin:18px 0 0 0;font-size:12.5px;line-height:1.6;color:#71717a;">${escapeHtml(copy.forgot)}</p>
-</td></tr>
-</table></td></tr></table></body></html>`;
+function smtpConfig(): SmtpConfig | null {
+  const host = (process.env.SMTP_HOST ?? "").trim();
+  const user = (process.env.SMTP_USER ?? "").trim();
+  const pass = (process.env.SMTP_PASS ?? "").trim();
+  if (!host || !user || !pass) return null;
 
-  const text = [copy.title, "", copy.body, "", input.loginUrl, "", copy.forgot].join("\n");
-  return { subject: copy.subject, html, text };
+  const port = Number((process.env.SMTP_PORT ?? "587").trim()) || 587;
+  // 465 es TLS implicito; 587 y 2587 son STARTTLS, que nodemailer negocia con
+  // `secure:false`. Se puede forzar con SMTP_SECURE para puertos raros.
+  const secure = (process.env.SMTP_SECURE ?? "").trim()
+    ? process.env.SMTP_SECURE!.trim() === "true"
+    : port === 465;
+
+  return { host, port, secure, user, pass };
+}
+
+function pickDriver(): Driver {
+  if (smtpConfig()) return "smtp";
+  if ((process.env.RESEND_API_KEY ?? "").trim()) return "resend";
+  return "log";
+}
+
+// ---------------------------------------------------------------------------
+// Transporte SMTP
+// ---------------------------------------------------------------------------
+
+let cached: Transporter | null = null;
+
+/**
+ * El transporter, una sola vez.
+ *
+ * `pool` mantiene la conexion abierta entre envios: sin eso cada invite paga un
+ * handshake TLS completo, que contra Gmail son ~400 ms de nada.
+ */
+function transporter(cfg: SmtpConfig): Transporter {
+  if (cached) return cached;
+  cached = nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass },
+    pool: true,
+    maxConnections: 3,
+    // Un alta que tarda mas de 20 s ya fallo para quien esta esperando en el
+    // formulario; que corte y quede el error asentado.
+    connectionTimeout: 20_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
+  return cached;
+}
+
+/**
+ * Prueba la conexion sin mandar nada.
+ *
+ * La usa el script de diagnostico: distingue "la credencial esta mal" de "el
+ * puerto esta bloqueado", que desde el lado del lead se ven igual.
+ */
+export async function verifySmtp(): Promise<{ ok: boolean; detail: string }> {
+  const cfg = smtpConfig();
+  if (!cfg) return { ok: false, detail: "sin SMTP_HOST / SMTP_USER / SMTP_PASS" };
+  try {
+    await transporter(cfg).verify();
+    return { ok: true, detail: `${cfg.host}:${cfg.port} (secure=${cfg.secure})` };
+  } catch (err: any) {
+    return { ok: false, detail: String(err?.message ?? err) };
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Envio
 // ---------------------------------------------------------------------------
 
-async function send(to: string, mail: { subject: string; html: string; text: string }) {
-  const apiKey = (process.env.RESEND_API_KEY ?? "").trim();
+async function sendSmtp(cfg: SmtpConfig, to: string, mail: RenderedMail) {
+  const info = await transporter(cfg).sendMail({
+    from: fromAddress(),
+    to,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+    // Un alta no es una campaña: que un autoresponder no conteste ni lo mande a
+    // la carpeta de promociones.
+    headers: { "X-Auto-Response-Suppress": "OOF, AutoReply" },
+  });
 
-  if (!apiKey) {
-    // Driver `log`. No es un fallback silencioso: lo unico que evita es que en
-    // local haya que tener una cuenta de Resend para probar el alta entera.
-    console.warn(
-      `[leads:mail:log] sin RESEND_API_KEY -> ${to} :: ${mail.subject}\n${mail.text}`,
-    );
-    return;
+  // `rejected` no tira excepcion: el servidor acepta el mensaje y descarta ese
+  // destinatario. Sin este chequeo seria otro exito falso.
+  if (info.rejected?.length) {
+    throw new Error(`smtp rechazo el destinatario: ${info.rejected.join(", ")}`);
   }
+  console.info(`[leads:mail:smtp] enviado a=${to} id=${info.messageId ?? "?"}`);
+}
 
+async function sendResend(to: string, mail: RenderedMail) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${(process.env.RESEND_API_KEY ?? "").trim()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -179,8 +185,6 @@ async function send(to: string, mail: { subject: string; html: string; text: str
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
-      // Un alta no es una campana: que un autoresponder no conteste ni lo mande
-      // a la carpeta de promociones.
       headers: { "X-Auto-Response-Suppress": "OOF, AutoReply" },
     }),
   });
@@ -189,12 +193,48 @@ async function send(to: string, mail: { subject: string; html: string; text: str
     const detail = await res.text().catch(() => "");
     throw new Error(`resend ${res.status}: ${detail.slice(0, 300)}`);
   }
+  console.info(`[leads:mail:resend] enviado a=${to}`);
+}
+
+async function send(to: string, mail: RenderedMail): Promise<void> {
+  const driver = pickDriver();
+
+  if (driver === "smtp") {
+    await sendSmtp(smtpConfig()!, to, mail);
+    return;
+  }
+
+  if (driver === "resend") {
+    await sendResend(to, mail);
+    return;
+  }
+
+  // driver === "log"
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "no hay transporte de correo configurado (faltan SMTP_HOST/SMTP_USER/SMTP_PASS)",
+    );
+  }
+  console.warn(
+    `[leads:mail:log] sin SMTP configurado -> ${to} :: ${mail.subject}\n${mail.text}`,
+  );
 }
 
 export const leadsMailer = {
   async sendInvite(input: InviteMailInput): Promise<void> {
     const locale = resolveLocale(input.locale);
-    await send(input.to, renderInvite(input, locale));
+    await send(
+      input.to,
+      renderInvite(
+        {
+          contactName: input.contactName,
+          hotelName: input.hotelName,
+          url: input.url,
+          expiresAt: input.expiresAt,
+        },
+        locale,
+      ),
+    );
   },
 
   async sendAlreadyRegistered(input: {
@@ -204,6 +244,9 @@ export const leadsMailer = {
     loginUrl: string;
   }): Promise<void> {
     const locale = resolveLocale(input.locale);
-    await send(input.to, renderExisting(input, locale));
+    await send(
+      input.to,
+      renderExisting({ hotelName: input.hotelName, loginUrl: input.loginUrl }, locale),
+    );
   },
 };

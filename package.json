@@ -59,7 +59,8 @@
     "smoke:prospects": "ts-node --transpile-only src/scripts/smokeProspects.ts",
     "smoke:dns": "ts-node --transpile-only src/scripts/smokeDns.ts",
     "smoke:infra": "ts-node --transpile-only src/scripts/smokeInfra.ts",
-    "smoke:leads": "ts-node --transpile-only src/scripts/smokeLeads.ts"
+    "smoke:leads": "ts-node --transpile-only src/scripts/smokeLeads.ts",
+    "mail:preview": "ts-node --transpile-only src/scripts/leadMailPreview.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
@@ -80,6 +81,7 @@
     "multer": "^2.1.1",
     "node-cron": "^3.0.3",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.10.1",
     "pdf-parse": "^1.1.1",
     "uuid": "^9.0.1",
     "ws": "^8.21.0"
@@ -93,6 +95,7 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.14.0",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.4",
     "@types/uuid": "^9.0.8",
     "@types/ws": "^8.18.1",
