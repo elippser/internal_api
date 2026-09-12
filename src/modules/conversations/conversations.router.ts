@@ -43,6 +43,14 @@ runtime.post(
 runtime.get("/files/:fileId", conversationsController.downloadFile);
 // Créditos de IA de la company (widget de uso del sidebar). Antes de "/:id".
 runtime.get("/credits", conversationsController.getCredits);
+// Voz a texto del dictado → POST /conversations/sessions/transcribe.
+//
+// Vive bajo /sessions como el resto del runtime (ahi esta el porton del
+// secreto interno), pero NO lleva requireSessionOwner: se dicta ANTES de que
+// exista la sesion, y exigir un sessionId obligaria a crear la conversacion
+// para poder hablar. Mismo criterio que "/credits". Va antes de "/:id" para
+// que el catch-all de sesion no lo capture.
+runtime.post("/transcribe", conversationsController.transcribe);
 runtime.get("/:id", requireSessionOwner, conversationsController.getSession);
 runtime.delete("/:id", requireSessionOwner, conversationsController.endSession);
 runtime.post(

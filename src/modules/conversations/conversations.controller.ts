@@ -2,6 +2,10 @@ import type { Request, Response } from "express";
 import { fail, ok } from "../../shared/utils/http";
 import { conversationsService } from "./conversations.service";
 import {
+  transcribeAudio,
+  TranscribeError,
+} from "./services/transcribe.service";
+import {
   actionSchema,
   createSessionSchema,
   listConversationsSchema,
@@ -124,6 +128,35 @@ export const conversationsController = {
       const result = await conversationsService.getCredits(companyId);
       return ok(res, result);
     } catch (err) {
+      return handleError(res, err);
+    }
+  },
+
+  /**
+   * Voz a texto para el dictado del chat.
+   *
+   * No depende de la sesión: el usuario dicta ANTES de que exista el turno, y
+   * exigir un sessionId obligaría a crear la conversación para poder hablar.
+   * Queda protegido por el secreto interno, como el resto del runtime.
+   */
+  async transcribe(req: Request, res: Response) {
+    try {
+      const audio = req.body?.audio;
+      if (typeof audio !== "string" || !audio) {
+        return fail(res, 400, "Falta el audio", "missing_audio");
+      }
+      const result = await transcribeAudio({
+        // El cliente puede mandar el data URL entero; se le saca el prefijo
+        // acá y no allá, para que un cliente viejo no rompa.
+        audioBase64: audio.replace(/^data:[^;]+;base64,/, ""),
+        format:
+          typeof req.body?.format === "string" ? req.body.format : undefined,
+      });
+      return ok(res, result);
+    } catch (err) {
+      if (err instanceof TranscribeError) {
+        return fail(res, err.status, err.message, "transcribe_failed");
+      }
       return handleError(res, err);
     }
   },
