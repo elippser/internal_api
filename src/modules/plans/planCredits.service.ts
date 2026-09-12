@@ -27,6 +27,35 @@ import { Plan } from "./plans.model";
 
 export const IA_PRODUCT_KEY = "roombir-ia";
 
+/**
+ * Claves que habilitan Roombir IA, incluida la del nombre anterior.
+ *
+ * El rename Bookfer → Roombir cambió el código pero NO los datos: los planes y
+ * los snapshots de cada company siguen diciendo `bookfer-ia`. Con el portón
+ * encendido eso dejó a TODAS las cuentas con "el plan no incluye Roombir IA",
+ * y no se veía en local porque ahí `IA_CREDITS_ENFORCEMENT=off` saltea el gate
+ * entero. Producción rota, local sano, misma base: la diferencia era un flag.
+ *
+ * El alias se queda para siempre, y no es deuda: `selectedPlan.productKeys` es
+ * un SNAPSHOT — el registro de lo que esa cuenta contrató el día que lo
+ * contrató. Reescribirlo para que diga el nombre nuevo sería falsificar el
+ * registro, y además dejaría rotas las cuentas que no se migren. Lo que sí
+ * corresponde migrar es el CATÁLOGO de planes, para que los snapshots nuevos
+ * nazcan con la clave nueva (`npm run migrate:ia-product-key`).
+ *
+ * Al agregar un producto nuevo NO se copia este patrón: esto existe sólo
+ * porque hubo un rename con datos vivos.
+ */
+export const IA_PRODUCT_KEYS = [IA_PRODUCT_KEY, "bookfer-ia"] as const;
+
+/** ¿Este conjunto de productos habilita la IA, con cualquiera de sus nombres? */
+export function includesIaProduct(productKeys: string[] | undefined): boolean {
+  if (!productKeys?.length) return false;
+  return productKeys.some((k) =>
+    (IA_PRODUCT_KEYS as readonly string[]).includes(k),
+  );
+}
+
 export type CreditsReason =
   | "ok"
   | "no_plan"
@@ -153,7 +182,7 @@ export const planCreditsService = {
       ? snapshot.productKeys
       : (plan?.productKeys ?? []);
 
-    if (!productKeys.includes(IA_PRODUCT_KEY)) {
+    if (!includesIaProduct(productKeys)) {
       return {
         ...base,
         hasPlan: true,

@@ -73,7 +73,10 @@
     "usage:baseline": "ts-node --transpile-only src/scripts/usageBaseline.ts",
     "smoke:strategic": "ts-node --transpile-only src/scripts/smokeStrategic.ts",
     "list:properties": "ts-node --transpile-only src/scripts/listProperties.ts",
-    "e2e:strategic": "ts-node --transpile-only src/scripts/e2eStrategic.ts"
+    "e2e:strategic": "ts-node --transpile-only src/scripts/e2eStrategic.ts",
+    "diagnose:ia-credits": "ts-node --transpile-only src/scripts/diagnoseIaCredits.ts",
+    "migrate:ia-product-key": "ts-node --transpile-only src/scripts/migrateIaProductKey.ts",
+    "fix:ia-plans": "ts-node --transpile-only src/scripts/fixIaPlans.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
