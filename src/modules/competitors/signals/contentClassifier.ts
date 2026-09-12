@@ -1,4 +1,5 @@
 import { callJson, emptyUsage } from "../ciLlm";
+import { modelFor } from "../../../shared/llm/provider";
 import {
   FEATURE_CATALOG,
   FEATURE_HAS,
@@ -12,12 +13,12 @@ import {
 } from "../competitors.model";
 
 /**
- * Clasificador Haiku de contenido (spec v2 §6): un post / release note /
+ * Clasificador de contenido del tier barato (spec v2 §6): un post / release note /
  * cambio de pagina → kind, severidad, resumen en espanol, features del
  * catalogo que menciona y, si anuncia una feature, con que grado.
  */
 
-export const signalsModel = () => process.env.CI_SIGNALS_MODEL ?? process.env.CI_DRAFT_MODEL ?? "claude-haiku-4-5-20251001";
+export const signalsModel = () => process.env.CI_SIGNALS_MODEL ?? process.env.CI_DRAFT_MODEL ?? modelFor("cheap");
 
 const featureCatalogText = FEATURE_CATALOG.map((f) => `${f.key} (${f.label})`).join(", ");
 

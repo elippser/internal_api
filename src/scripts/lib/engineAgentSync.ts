@@ -18,6 +18,7 @@
  * versiones idénticas.
  */
 import { EngineAgent } from "../../engine/models/agent.model";
+import { engineModelFor } from "../../shared/llm/provider";
 import { EngineAgentVersion } from "../../engine/models/agentVersion.model";
 import { newId } from "../../engine/core/ids";
 
@@ -32,7 +33,7 @@ export interface PublishDelta {
   /** System prompt. Si falta, se conserva el actual. */
   systemPrompt?: string;
   /**
-   * Modelo SIN cualificar (ej. "claude-sonnet-4-6"). Se cualifica con
+   * Modelo SIN cualificar (ej. "z-ai/glm-5.3-flash"). Se cualifica con
    * `anthropic/` si no trae proveedor. Si falta, se conserva el actual.
    */
   model?: string;
@@ -49,10 +50,23 @@ export interface PublishResult {
   changed?: string[];
 }
 
+/**
+ * Cualifica un id de modelo con su proveedor.
+ *
+ * No alcanza con mirar si hay una barra: los ids de OpenRouter YA traen una
+ * porque incluyen su proveedor de origen (`z-ai/glm-5.3-flash`), y dejarlos
+ * pasar sin prefijo hace que el motor los lea como proveedor "z-ai" y falle con
+ * un 501 al primer turno. Se decide por la lista de proveedores que el motor
+ * sabe resolver; cualquier otra cosa se asume del gateway, que es de donde sale
+ * todo el catalogo desde la migracion.
+ */
+const KNOWN_PROVIDERS = ["openrouter/", "anthropic/", "claude/", "anthropic-api/"];
+
 function qualifyModel(raw: string): string {
   const bare = raw.trim();
   if (!bare) return bare;
-  return bare.includes("/") ? bare : `anthropic/${bare}`;
+  if (KNOWN_PROVIDERS.some((p) => bare.startsWith(p))) return bare;
+  return `openrouter/${bare}`;
 }
 
 function sameList(a: string[], b: string[]): boolean {
@@ -83,7 +97,7 @@ export async function publishOpsAgentVersion(
   const nextPrompt = delta.systemPrompt ?? current?.systemPrompt ?? "";
   const nextModel = delta.model
     ? qualifyModel(delta.model)
-    : (current?.modelName ?? "anthropic/claude-sonnet-4-6");
+    : (current?.modelName ?? engineModelFor("standard"));
 
   const changed: string[] = [];
   if (!sameList(nextTools, current?.tools ?? [])) changed.push("tools");

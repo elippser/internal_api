@@ -46,6 +46,13 @@ export const postMessageSchema = Joi.object({
 export const actionSchema = Joi.object({
   toolName: Joi.string().min(1).max(80).required(),
   args: Joi.object().default({}),
+  // Confirmación dura: la tarjeta devuelve el `confirmationId` que emitió el
+  // runner al frenar un borrado o una acción irreversible, y `confirmText` con
+  // lo que el usuario escribió cuando había que re-escribir el nombre del
+  // recurso. Sin confirmationId, `executeAction` sólo acepta las tools de las
+  // cards accionables de siempre (ACTIONABLE_TOOLS).
+  confirmationId: Joi.string().max(120).optional(),
+  confirmText: Joi.string().max(400).allow("").optional(),
 });
 
 export const rateMessageSchema = Joi.object({

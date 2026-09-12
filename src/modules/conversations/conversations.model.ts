@@ -51,6 +51,25 @@ const pendingConfirmationSchema = new Schema(
     toolName: { type: String, required: true },
     inputArgs: { type: Schema.Types.Mixed, default: {} },
     requestedAt: { type: Date, default: () => new Date() },
+    // ── Gate duro de confirmación (ver confirmationPolicy.ts) ──────────────
+    // Cuando el runner frena un borrado o una acción irreversible, guarda acá
+    // la llamada EXACTA que quedó pendiente y le manda al chat una tarjeta.
+    // `executeAction` sólo ejecuta si el confirmationId coincide y —cuando el
+    // nivel es "typed"— el usuario escribió `subjectValue`. Sin esto, el gate
+    // sería una sugerencia en el prompt: el modelo podría saltearlo.
+    confirmationId: { type: String, default: "" },
+    /** "card" (botón Confirmar) | "typed" (hay que escribir el valor). */
+    level: { type: String, enum: ["card", "typed"], default: "card" },
+    /** Argumento cuyo valor hay que re-escribir (sólo "typed"). */
+    subjectArg: { type: String, default: "" },
+    /** Valor exacto esperado (sólo "typed"). */
+    subjectValue: { type: String, default: "" },
+    /** Motivo legible de por qué se frenó. */
+    reason: { type: String, default: "" },
+    /** Nombre de la acción tal como se le muestra al usuario. */
+    displayName: { type: String, default: "" },
+    /** Vence sola: una confirmación vieja no se ejecuta por accidente. */
+    expiresAt: { type: Date },
   },
   { _id: false },
 );
@@ -168,6 +187,32 @@ const agentMetaSchema = new Schema(
     subAgent: { type: String, default: "" },
     subAgentLabel: { type: String, default: "" },
     routedTier: { type: String, default: "" },
+    /**
+     * Telemetría del turno estratégico. Es lo que permite responder, sin leer
+     * transcripciones, la única pregunta que importa de este rediseño: ¿el plan
+     * salió de los datos del hotel o el modelo improvisó?
+     *
+     * `forced` subiendo significa que el modelo del tier no entrega el plan por
+     * las suyas y hay que cambiarlo. `stepsDropped` subiendo significa que
+     * propone cosas que el usuario no puede hacer — o el índice de palancas o
+     * el prompt están mal.
+     */
+    strategic: {
+      type: new Schema(
+        {
+          snapshotMs: { type: Number, default: 0 },
+          missing: { type: [String], default: [] },
+          playbookIds: { type: [String], default: [] },
+          leverCount: { type: Number, default: 0 },
+          stepsProposed: { type: Number, default: 0 },
+          stepsDropped: { type: Number, default: 0 },
+          planId: { type: String, default: null },
+          forced: { type: Boolean, default: false },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
   },
   { _id: false },
 );

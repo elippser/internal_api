@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import cron from "node-cron";
+import { getLlmClient, modelFor } from "../../shared/llm/provider";
 import { v4 as uuidv4 } from "uuid";
 import { FeedbackRequest } from "../feedback/feedback.model";
 import { cosineSimilarity, getEmbedder } from "../../shared/rag/embedder";
@@ -26,19 +26,9 @@ const DEDUP_THRESHOLD = Number(
   process.env.TICKET_DEDUP_THRESHOLD ??
     (process.env.OPENAI_API_KEY ? 0.8 : 0.45),
 );
-const DEFAULT_MODEL =
-  process.env.DEFAULT_AGENT_MODEL ?? "claude-sonnet-4-6";
+const DEFAULT_MODEL = process.env.DEFAULT_AGENT_MODEL ?? modelFor("standard");
 
 let started = false;
-let cachedClient: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (cachedClient) return cachedClient;
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("ANTHROPIC_API_KEY no esta configurada");
-  cachedClient = new Anthropic({ apiKey: key });
-  return cachedClient;
-}
 
 export interface CronRunSummary {
   runId: string;
@@ -261,7 +251,7 @@ async function synthesize(
   summaries: string[],
   messages: string[],
 ): Promise<{ title: string; description: string; type: TicketType }> {
-  const client = getClient();
+  const client = getLlmClient();
   const sysPrompt =
     "Sos un product manager. Te paso varios pedidos de usuarios sobre " +
     "una misma necesidad. Tu trabajo es sintetizarlos en UN ticket de " +

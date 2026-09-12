@@ -54,7 +54,7 @@ const FORCE = process.argv.includes("--force");
  * turno con escrituras. Migrar por debajo del piso degradaría agentes que hoy
  * funcionan.
  */
-const OPERATIONAL_FLOOR = process.env.OPERATIONAL_MODEL_FLOOR ?? "claude-sonnet-4-6";
+const OPERATIONAL_FLOOR = process.env.OPERATIONAL_MODEL_FLOOR ?? "z-ai/glm-5.3-flash";
 
 interface Row {
   slug: string;

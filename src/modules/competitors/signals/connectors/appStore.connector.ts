@@ -52,7 +52,7 @@ function countryOf(p: { url?: string }): string {
 export const appStoreConnector: SignalConnector = {
   id: "app_store",
   label: "App Store (iTunes Lookup)",
-  paid: false, // Haiku solo en release notes nuevas (se respeta allowPaid para eso)
+  paid: false, // El tier barato solo en release notes nuevas (se respeta allowPaid para eso)
   accepts: { networks: ["app_store"] },
   async healthCheck() {
     return { ok: true, detail: "API pública de Apple, sin key" };

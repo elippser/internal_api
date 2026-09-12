@@ -1,7 +1,14 @@
 import { Tool } from "../../tools/tools.model";
 import { feedbackService } from "../../feedback/feedback.service";
 import { sanitizeMessage } from "../conversations.model";
-import { getAnthropic } from "./anthropicClient";
+import {
+  getLlmClient,
+  modelFor,
+  modelRank,
+  serverToolSupport,
+  thinkingBlockFor,
+  withReasoningHeadroom,
+} from "../../../shared/llm/provider";
 import {
   ADD_IMAGE_TO_LIBRARY_TOOL_SCHEMA,
   CAPTURE_FEEDBACK_TOOL_SCHEMA,
@@ -14,11 +21,31 @@ import {
   type ToolErrorKind,
 } from "./toolExecutor";
 import { loadSkillBody } from "../../../engine/skills/resolver";
+import {
+  defaultProfile,
+  type ToolChoice,
+  type TurnProfile,
+} from "./turnProfile";
+import {
+  PROPOSE_GROWTH_PLAN,
+  runProposeGrowthPlan,
+  type PlanToolContext,
+} from "../../growth/plan/planTool";
 import { checkToolCall } from "./toolAccess";
 import { evaluateAccess } from "../../../shared/agentAuth/routePolicy";
 import type { UserScope } from "../../../shared/agentAuth/userScope";
 import { pmsRequest, PmsProxyError } from "../../../shared/middleware/pmsProxy";
 import { mintAgentJwt } from "../../../shared/agentAuth/agentJwt";
+import { confirmationFor } from "./confirmationPolicy";
+import { normalizeToolSchema } from "../../../shared/llm/toolSchema";
+import { randomUUID } from "crypto";
+
+/**
+ * Cuánto vive una confirmación pendiente. Corta pero no molesta: si el usuario
+ * deja la pestaña abierta y vuelve mañana, el borrado que pidió ayer no se
+ * ejecuta con un click distraído — tiene que volver a pedirlo.
+ */
+const CONFIRMATION_TTL_MS = 15 * 60 * 1000;
 
 const MAX_ITERATIONS = Number(process.env.MAX_TOOL_ITERATIONS ?? 5);
 
@@ -31,30 +58,26 @@ const CODE_EXEC_ON =
   (process.env.ROOMBIR_CODE_EXEC ?? process.env.LAUPSER_CODE_EXEC ?? "true").toLowerCase() !== "false";
 
 // Piso de capacidad para agentes operativos (con tools de escritura/PMS). Un
-// modelo de la familia "haiku" no orquesta tools de forma confiable: deflexiona
+// modelo del tier barato no orquesta tools de forma confiable: deflexiona
 // a texto plano (no llama la tool -> la UI no puede renderizar cards porque no
 // hay tool result) y alucina datos. Por eso, para agentes operativos elevamos
 // el modelo a este piso aunque el modelOverride apunte mas abajo. Es a nivel
 // runtime a proposito: no se puede foot-gunear desde la UI/DB. Los agentes de
 // solo-lectura / KB / Q&A NO son operativos y conservan su override economico.
 const OPERATIONAL_MODEL_FLOOR =
-  process.env.OPERATIONAL_MODEL_FLOOR ?? "claude-sonnet-4-6";
+  process.env.OPERATIONAL_MODEL_FLOOR ?? modelFor("standard");
 
-// Rango de capacidad por familia. Solo necesitamos distinguir "haiku" (debil
-// para orquestar tools) del resto. Un modelo desconocido se trata como capaz
-// (rank alto) para no degradar uno elegido a proposito por el operador.
-function modelRank(model: string): number {
-  const m = model.toLowerCase();
-  if (m.includes("haiku")) return 1;
-  if (m.includes("sonnet")) return 2;
-  if (m.includes("opus")) return 3;
-  return 99;
-}
+// El rango de capacidad vive en shared/llm/provider.ts: se ordena por TIER, no
+// por el nombre del modelo. Ordenar por nombre funcionaba mientras todos los
+// modelos eran de la misma familia ("haiku" < "sonnet" < "opus"); con un
+// catalogo de varios proveedores no hay subcadena que sirva, y un rango mal
+// leido desactiva el piso justo en el turno que lo necesitaba.
 
 // Aplica el piso operativo sobre el modelo YA enrutado y las tools EFECTIVAS
 // del turno. Si el turno lleva tools de escritura, el modelo nunca baja del
-// piso (Sonnet), aunque el router haya elegido un tier mas economico. Turnos de
-// solo-lectura conservan el modelo enrutado (ej. Haiku para "consulta").
+// piso (tier estandar), aunque el router haya elegido un tier mas economico.
+// Turnos de solo-lectura conservan el modelo enrutado (ej. el barato para
+// "consulta").
 async function applyOperationalFloor(
   model: string,
   toolIds: string[],
@@ -237,8 +260,45 @@ export interface TurnAttachment {
 
 // Label en gerundio (español) para el status del paso, derivado del nombre de
 // la tool. Evita exponer args/jerga; solo "qué está haciendo".
+/**
+ * ¿Esta llamada se puede correr en paralelo con otras del mismo response?
+ *
+ * Sólo las lecturas del catálogo (GET, categoría no-write, no destructiva). Las
+ * internas quedan fuera a propósito aunque algunas sean inocuas: `load_skill`
+ * podría paralelizarse, pero el beneficio es nulo (el modelo carga una sola) y
+ * el riesgo de que alguien agregue una interna con efectos y la herede, no.
+ *
+ * Ante la duda devuelve false: ejecutar en serie algo que podía ir en paralelo
+ * cuesta latencia; paralelizar algo que dependía del anterior corrompe datos.
+ */
+const INTERNAL_TOOL_NAMES = new Set([
+  "load_skill",
+  "capture_feedback_request",
+  "add_image_to_library",
+  PROPOSE_GROWTH_PLAN,
+]);
+
+async function isReadOnlyCall(toolName: string): Promise<boolean> {
+  if (INTERNAL_TOOL_NAMES.has(toolName)) return false;
+  try {
+    const tool = await Tool.findOne(
+      { name: toolName, status: "active" },
+      { category: 1, "execution.method": 1, "permissions.isDestructive": 1 },
+    ).lean();
+    if (!tool) return false;
+    return (
+      tool.execution?.method === "GET" &&
+      !/(_write$|^raw_write$)/.test(tool.category) &&
+      tool.permissions?.isDestructive !== true
+    );
+  } catch {
+    return false;
+  }
+}
+
 function stepLabelForTool(toolName: string): string {
   const n = toolName.toLowerCase();
+  if (n === PROPOSE_GROWTH_PLAN) return "Armando el plan…";
   if (n === "add_image_to_library") return "Guardando en la librería…";
   if (n === "load_skill") return "Repasando el procedimiento…";
   if (n === "global_search" || n === "search_reservations") return "Buscando…";
@@ -281,6 +341,24 @@ export interface TurnResult {
   latencyMs: number;
   stopReason: string;
   modelUsed: string;
+  /**
+   * Telemetría del turno estratégico. Responde "¿el plan salió de la foto o el
+   * modelo improvisó?" sin tener que leer la transcripción — que es la única
+   * forma de saber si esto sigue funcionando dentro de tres meses.
+   */
+  strategic?: StrategicTurnMeta;
+}
+
+export interface StrategicTurnMeta {
+  snapshotMs: number;
+  missing: string[];
+  playbookIds: string[];
+  leverCount: number;
+  stepsProposed: number;
+  stepsDropped: number;
+  planId?: string;
+  /** El modelo cerró sin entregar el plan y hubo que forzarlo. */
+  forced: boolean;
 }
 
 interface RunTurnInput {
@@ -303,7 +381,7 @@ interface RunTurnInput {
   model: string;
   toolIds: string[];
   specialization?: string;
-  // Server tools de Anthropic habilitadas por el sub-agente (no en Haiku).
+  // Server tools habilitadas por el sub-agente.
   webSearch?: boolean;
   codeExec?: boolean;
   // Adjuntos del usuario de este turno (para la tool interna de librería).
@@ -330,6 +408,19 @@ interface RunTurnInput {
   // loop pausó) y lo que venga después es OTRO segmento. El cliente no lo
   // borra: lo deja fijo y abre un borrador nuevo para el texto siguiente.
   onTextEnd?: () => void;
+  /**
+   * Parámetros del loop para este turno (iteraciones, tool_choice, cierre sin
+   * tools). Omitirlo deja el comportamiento de siempre.
+   */
+  profile?: TurnProfile;
+  /**
+   * Contexto del turno estratégico: la foto, los playbooks ofrecidos y el
+   * índice de palancas. Lo arma `strategicTurn.prepare()`. Su presencia es lo
+   * que habilita la tool `propose_growth_plan`.
+   */
+  planContext?: PlanToolContext;
+  /** Telemetría de la preparación (lo que tardó la foto y qué faltó). */
+  strategicMeta?: Pick<StrategicTurnMeta, "snapshotMs" | "missing" | "playbookIds" | "leverCount">;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -337,6 +428,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   const start = Date.now();
   const { session, agent, history, userMessage } = input;
+  const profile = input.profile ?? defaultProfile();
 
   // System como bloques: el prefijo estable lleva cache_control (prompt cache);
   // lo volátil (contexto/RAG/memoria + especialización del sub-agente) va en un
@@ -365,7 +457,12 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
 
   // Tools efectivas del turno (las que el router dejo en alcance).
   const tools: AnthropicTool[] = await resolveTools(input.toolIds);
-  if (agent.feedbackCapture.enabled) {
+  // En el turno estratégico NO se ofrece registrar pedidos de funcionalidad.
+  // Medido en un turno real: ante "no entiendo nada, quiero más ocupación" el
+  // modelo la usó para anotar el pedido como feature faltante, gastando una de
+  // las pocas iteraciones. La plataforma SÍ tiene con qué contestar eso; lo que
+  // falta no es una función, es el plan.
+  if (agent.feedbackCapture.enabled && !input.planContext) {
     tools.push(CAPTURE_FEEDBACK_TOOL_SCHEMA);
   }
   // Solo ofrecemos la tool de librería si el usuario adjuntó una imagen en este
@@ -379,6 +476,20 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   // sólo invita al modelo a llamarla y recibir un error.
   if (input.hasSkills) {
     tools.push(LOAD_SKILL_TOOL_SCHEMA);
+  }
+  // Tools internas del perfil (hoy: `propose_growth_plan` en el estratégico).
+  for (const t of profile.internalTools ?? []) tools.push(t);
+
+  // Las internas se declaran en código y hasta ahora viajaban CRUDAS: sólo las
+  // del catálogo pasaban por el normalizador. Un `enum` numérico en una de
+  // ellas hacía que el proveedor devolviera sus argumentos vacíos, sin error —
+  // que es exactamente cómo se rompió `propose_growth_plan` la primera vez.
+  // Estar escritas a mano no las hace correctas; las hace menos revisadas.
+  for (let i = 0; i < tools.length; i++) {
+    const t = tools[i] as AnthropicTool;
+    if (t?.input_schema) {
+      tools[i] = { ...t, input_schema: normalizeToolSchema(t.input_schema) };
+    }
   }
 
   const toolsExecuted: ToolExecutionMeta[] = [];
@@ -407,27 +518,45 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   // El modelo viene enrutado; el piso operativo lo eleva si el turno lleva writes.
   const modelUsed = await applyOperationalFloor(input.model, input.toolIds);
 
-  // Server tools de Anthropic (no en Haiku, que no las soporta de forma
-  // confiable): web_search para responder con info en línea, code_execution
+  // Server tools: web_search para responder con info en línea, code_execution
   // para GENERAR archivos (gráficos/imágenes con matplotlib/PIL, docx/xlsx/pdf).
-  const isHaiku = modelUsed.toLowerCase().includes("haiku");
-  if (input.webSearch && !isHaiku && WEB_SEARCH_ON) {
+  // Corren del lado del proveedor, así que qué está disponible lo dice
+  // `serverToolSupport` con lo que se midió, no el nombre del modelo.
+  const serverTools = serverToolSupport(modelUsed);
+  if (input.webSearch && serverTools.webSearch && WEB_SEARCH_ON) {
     (tools as unknown[]).push({
       type: "web_search_20260209",
       name: "web_search",
       max_uses: 5,
     });
   }
-  if (input.codeExec && !isHaiku && CODE_EXEC_ON) {
-    (tools as unknown[]).push({
-      type: "code_execution_20260120",
-      name: "code_execution",
-    });
+  if (input.codeExec && CODE_EXEC_ON) {
+    if (serverTools.codeExecution) {
+      (tools as unknown[]).push({
+        type: "code_execution_20260120",
+        name: "code_execution",
+      });
+    } else {
+      // Se omite en silencio a propósito: mandarla contra un proveedor que no
+      // la ejecuta devuelve 400 y se lleva puesto el turno entero, cuando lo
+      // único que se pierde por omitirla es la generación de archivos.
+      console.warn(
+        `[conversationRunner] code_execution pedida pero no disponible para "${modelUsed}"; ` +
+        `el turno sigue sin ella (LLM_CODE_EXECUTION=on para forzarla).`,
+      );
+    }
   }
 
-  const client = getAnthropic();
+  const client = getLlmClient();
 
-  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+  // Estado del turno estratégico. `planOutcome` se llena cuando el modelo
+  // entrega el plan; el loop lo mira para decidir si todavía hace falta forzar
+  // la tool.
+  let planOutcome: Awaited<ReturnType<typeof runProposeGrowthPlan>> | null = null;
+  let planForced = false;
+  const toolsUsed: string[] = [];
+
+  for (let iter = 0; iter < profile.maxIterations; iter++) {
     // Usamos el stream del SDK con dos fines: (1) reenviar EN VIVO los deltas
     // de texto al cliente (onDelta) para que la respuesta se pinte a medida que
     // el modelo escribe, y (2) detectar cuándo arrancan las server tools
@@ -444,14 +573,65 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
       string,
       Extract<TurnTraceItem, { kind: "tool" }>
     >();
+    // Consumo leído del alambre, no del mensaje que arma el SDK.
+    //
+    // OpenRouter manda `message_start` con el usage en CERO y recién informa los
+    // totales en `message_delta`; el acumulador del SDK 0.27.x se queda con el
+    // primero para la entrada, así que `finalMessage().usage.input_tokens`
+    // vuelve en cero y el ledger factura de menos cada turno del chat. Se toma
+    // el máximo visto de cada campo y se usa si el mensaje final vino vacío.
+    const wireUsage = { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 };
+
+    // `tool_choice` del perfil. En el turno estratégico la primera vuelta
+    // obliga a usar alguna tool y la segunda fuerza la entrega del plan: sin
+    // eso el modelo escribe tres párrafos de consejos y cierra sin tarjeta,
+    // que es exactamente el comportamiento que este rediseño corrige.
+    const toolChoice: ToolChoice =
+      tools.length > 0 ? profile.toolChoiceFor?.(iter, { used: toolsUsed }) : undefined;
+    if (toolChoice?.type === "tool" && toolChoice.name === PROPOSE_GROWTH_PLAN) {
+      // El modelo llegó a la segunda vuelta sin entregar el plan y hay que
+      // forzárselo. Se anota para poder medirlo: si esto sube, el modelo del
+      // tier no sirve para este perfil y hay que cambiarlo, no insistir.
+      planForced = true;
+    }
+
+    // Razonamiento acotado. `withReasoningHeadroom` suma el margen POR ENCIMA
+    // del pedido del consumidor: el razonamiento sale del mismo presupuesto de
+    // salida, y un techo justo devuelve un mensaje sin bloque de texto y sin
+    // error (trampa 2b de la migración a OpenRouter).
+    const maxTokens = agent.limits.maxTokensPerTurn || 4096;
+    const thinking = profile.thinkingBudget
+      ? thinkingBlockFor(modelUsed, {
+          enabled: true,
+          budgetTokens: profile.thinkingBudget,
+        })
+      : undefined;
+
     const stream = client.messages.stream({
       model: modelUsed,
-      max_tokens: agent.limits.maxTokensPerTurn || 4096,
+      max_tokens: profile.thinkingBudget
+        ? withReasoningHeadroom(modelUsed, maxTokens)
+        : maxTokens,
+      ...(thinking ? { thinking } : {}),
       system: system as any,
       messages,
       tools: tools.length > 0 ? (tools as any) : undefined,
+      ...(toolChoice ? { tool_choice: toolChoice as any } : {}),
     });
     stream.on("streamEvent", (event: any) => {
+      if (event?.type === "message_start" || event?.type === "message_delta") {
+        const u = event.usage ?? event.message?.usage;
+        if (u) {
+          const n = (v: unknown): number => (typeof v === "number" ? v : 0);
+          wireUsage.input = Math.max(wireUsage.input, n(u.input_tokens));
+          wireUsage.output = Math.max(wireUsage.output, n(u.output_tokens));
+          wireUsage.cacheRead = Math.max(wireUsage.cacheRead, n(u.cache_read_input_tokens));
+          wireUsage.cacheCreate = Math.max(
+            wireUsage.cacheCreate,
+            n(u.cache_creation_input_tokens),
+          );
+        }
+      }
       // Delta de texto del modelo → directo al cliente.
       if (
         event?.type === "content_block_delta" &&
@@ -525,10 +705,13 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
       cache_read_input_tokens?: number;
       cache_creation_input_tokens?: number;
     };
-    totalIn += usage.input_tokens;
-    totalOut += usage.output_tokens;
-    cacheRead += usage.cache_read_input_tokens ?? 0;
-    cacheCreate += usage.cache_creation_input_tokens ?? 0;
+    // El mensaje final del SDK manda cuando trae algo; si vino en cero (ver
+    // `wireUsage`), se usa lo que se leyó del stream. Nunca al revés: cuando el
+    // proveedor sí completa el mensaje final, ese es el dato canónico.
+    totalIn += usage.input_tokens || wireUsage.input;
+    totalOut += usage.output_tokens || wireUsage.output;
+    cacheRead += usage.cache_read_input_tokens ?? wireUsage.cacheRead;
+    cacheCreate += usage.cache_creation_input_tokens ?? wireUsage.cacheCreate;
     stopReason = response.stop_reason ?? "";
 
     // Archivos generados por code_execution en este response. El step ya se
@@ -591,6 +774,7 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
         latencyMs: Date.now() - start,
         stopReason,
         modelUsed,
+        strategic: strategicMeta(),
       };
     }
 
@@ -608,7 +792,26 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
       content: string;
     }> = [];
 
-    for (const block of toolUseBlocks) {
+    // Las LECTURAS del mismo response corren en paralelo; las escrituras, en
+    // serie y en el orden que el modelo pidió.
+    //
+    // El orden importa en las escrituras y no en las lecturas: crear una
+    // categoría y después asignarle una unidad no se puede invertir, pero leer
+    // reservas y leer el plano son independientes. Cuando el modelo pide cuatro
+    // lecturas juntas —lo típico de un diagnóstico— esto convierte cuatro
+    // esperas consecutivas en una.
+    const readFlags = await Promise.all(
+      toolUseBlocks.map((b: any) => isReadOnlyCall(b.name)),
+    );
+    const groups: Array<{ parallel: boolean; blocks: any[] }> = [];
+    for (let i = 0; i < toolUseBlocks.length; i++) {
+      const isRead = readFlags[i];
+      const last = groups[groups.length - 1];
+      if (isRead && last?.parallel) last.blocks.push(toolUseBlocks[i]);
+      else groups.push({ parallel: isRead, blocks: [toolUseBlocks[i]] });
+    }
+
+    const runOne = async (block: any) => {
       const label = stepLabelForTool(block.name);
       input.onStep?.({ kind: "tool_start", toolName: block.name, label });
       const handled = await handleToolCall(
@@ -616,7 +819,12 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
         agent,
         session,
         input.userMessage,
-        { attachments: turnAttachments, onStep: input.onStep, scope: input.scope ?? null },
+        {
+          attachments: turnAttachments,
+          onStep: input.onStep,
+          scope: input.scope ?? null,
+          planContext: input.planContext,
+        },
       );
       input.onStep?.({
         kind: "tool_done",
@@ -624,20 +832,80 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
         label,
         status: handled.execMeta.outcome === "success" ? "ok" : "error",
       });
-      trace.push({
-        kind: "tool",
-        toolName: block.name,
-        label,
-        outcome: handled.execMeta.outcome,
-      });
-      toolsExecuted.push(handled.execMeta);
-      toolResults.push({
-        type: "tool_result",
-        tool_use_id: block.id,
-        content: JSON.stringify(handled.output),
-      });
+      return { block, label, handled };
+    };
+
+    for (const group of groups) {
+      const done = group.parallel
+        ? await Promise.all(group.blocks.map(runOne))
+        : await (async () => {
+            const out = [];
+            for (const b of group.blocks) out.push(await runOne(b));
+            return out;
+          })();
+
+      for (const { block, label, handled } of done) {
+        trace.push({
+          kind: "tool",
+          toolName: block.name,
+          label,
+          outcome: handled.execMeta.outcome,
+        });
+        toolsExecuted.push(handled.execMeta);
+        toolsUsed.push(block.name);
+        if (handled.planOutcome?.ok) {
+          planOutcome = handled.planOutcome;
+        }
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: JSON.stringify(handled.output),
+        });
+      }
     }
     messages.push({ role: "user", content: toolResults });
+  }
+
+  // ── Se acabaron las iteraciones ────────────────────────────────────────────
+  //
+  // Antes esto devolvía "no pude terminar, reformulá" y TIRABA todo lo leído:
+  // el usuario esperaba cuarenta segundos, el turno ya estaba pago, y la
+  // respuesta era pedirle que lo escriba de nuevo. Ahora se hace una pasada
+  // final SIN tools para que el modelo cierre con lo que juntó. Es la misma
+  // información, ordenada, en vez de nada.
+  if (profile.finalizeWithoutTools && toolsExecuted.length > 0) {
+    closeText();
+    const closing = await finalizeWithoutTools({
+      client,
+      model: modelUsed,
+      maxTokens: agent.limits.maxTokensPerTurn || 4096,
+      system,
+      messages,
+    });
+    if (closing) {
+      totalIn += closing.inputTokens;
+      totalOut += closing.outputTokens;
+      cacheRead += closing.cacheReadTokens;
+      cacheCreate += closing.cacheCreationTokens;
+      if (closing.text) {
+        return {
+          content: closing.text,
+          trace,
+          toolsExecuted,
+          ragChunksUsed: input.ragChunksUsed,
+          inputTokens: totalIn,
+          outputTokens: totalOut,
+          cacheReadInputTokens: cacheRead,
+          cacheCreationInputTokens: cacheCreate,
+          generatedFiles,
+          webSources,
+          latencyMs: Date.now() - start,
+          stopReason: "max_iterations_finalized",
+          modelUsed,
+          strategic: strategicMeta(),
+        };
+      }
+    }
   }
 
   return {
@@ -655,18 +923,97 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
     latencyMs: Date.now() - start,
     stopReason: "max_iterations_reached",
     modelUsed,
+    strategic: strategicMeta(),
   };
+
+  /** Telemetría del turno estratégico, si lo fue. */
+  function strategicMeta(): StrategicTurnMeta | undefined {
+    if (!input.planContext || !input.strategicMeta) return undefined;
+    return {
+      ...input.strategicMeta,
+      stepsProposed: planOutcome?.stepsProposed ?? 0,
+      stepsDropped: planOutcome?.stepsDropped ?? 0,
+      planId: planOutcome?.planId,
+      forced: planForced,
+    };
+  }
+}
+
+/**
+ * Pasada final sin tools: "cerrá con lo que tenés".
+ *
+ * Se le saca el `tools` al pedido a propósito. Dejárselas y pedirle por prompt
+ * que no las use es una invitación a que las use, y ahí el turno queda colgado
+ * con un tool_use que ya nadie va a ejecutar.
+ */
+async function finalizeWithoutTools(input: {
+  client: ReturnType<typeof getLlmClient>;
+  model: string;
+  maxTokens: number;
+  system: any[];
+  messages: any[];
+}): Promise<{
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+} | null> {
+  try {
+    const res = await input.client.messages.create({
+      model: input.model,
+      max_tokens: Math.min(input.maxTokens, 1500),
+      system: input.system as any,
+      messages: [
+        ...input.messages,
+        {
+          role: "user",
+          content:
+            "Cerrá el turno ACÁ con lo que ya averiguaste. No llames más herramientas. " +
+            "Respondé lo que el usuario preguntó con los datos que tenés, y si algo quedó " +
+            "sin resolver decilo en una línea al final.",
+        },
+      ],
+    });
+    const usage = res.usage as {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
+    const text = (res.content as Array<{ type: string; text?: string }>)
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join("\n")
+      .trim();
+    return {
+      text,
+      inputTokens: usage?.input_tokens ?? 0,
+      outputTokens: usage?.output_tokens ?? 0,
+      cacheReadTokens: usage?.cache_read_input_tokens ?? 0,
+      cacheCreationTokens: usage?.cache_creation_input_tokens ?? 0,
+    };
+  } catch (err) {
+    console.warn(
+      "[conversationRunner] el cierre sin tools falló:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
 }
 
 interface ToolHandleResult {
   output: unknown;
   execMeta: ToolExecutionMeta;
+  /** Sólo `propose_growth_plan`: lo que quedó del plan tras validarlo. */
+  planOutcome?: Awaited<ReturnType<typeof runProposeGrowthPlan>>;
 }
 
 interface ToolCallExtras {
   attachments: TurnAttachment[];
   onStep?: (e: StepEvent) => void;
   scope?: UserScope | null;
+  planContext?: PlanToolContext;
 }
 
 async function handleToolCall(
@@ -682,6 +1029,50 @@ async function handleToolCall(
   // ---- Tool interna: add_image_to_library ----
   if (block.name === "add_image_to_library") {
     return handleAddImageToLibrary(block, agent, session, extras);
+  }
+
+  // ---- Tool interna: propose_growth_plan (turno estratégico) ----
+  //
+  // El modelo propone; acá se valida contra el catálogo real y los permisos del
+  // usuario, se persiste y se devuelve el plan que la tarjeta va a dibujar. Sin
+  // `planContext` la tool ni siquiera se ofreció, así que llegar acá sin él es
+  // un bug del armado del turno, no del modelo.
+  if (block.name === PROPOSE_GROWTH_PLAN) {
+    if (!extras.planContext) {
+      return {
+        output: {
+          error: true,
+          message:
+            "Esta herramienta sólo está disponible en un turno de planificación.",
+        },
+        execMeta: {
+          toolId: "internal-growth-plan",
+          toolName: PROPOSE_GROWTH_PLAN,
+          inputArgs: input,
+          outcome: "error",
+          errorMessage: "sin contexto de plan",
+          durationMs: Date.now() - start,
+          retried: false,
+        },
+      };
+    }
+    const outcome = await runProposeGrowthPlan(input, extras.planContext);
+    return {
+      output: outcome.output,
+      planOutcome: outcome,
+      execMeta: {
+        toolId: "internal-growth-plan",
+        toolName: PROPOSE_GROWTH_PLAN,
+        inputArgs: input,
+        outcome: outcome.ok ? "success" : "error",
+        // El resultado va entero a la traza: es lo que la tarjeta re-renderiza
+        // al retomar la conversación más tarde.
+        result: outcome.ok ? (outcome.output as Record<string, unknown>) : undefined,
+        errorMessage: outcome.ok ? undefined : (outcome.reason ?? "el plan no pasó la validación"),
+        durationMs: Date.now() - start,
+        retried: false,
+      },
+    };
   }
 
   // ---- Tool interna: load_skill (nivel 2 de la revelación progresiva) ----
@@ -846,16 +1237,66 @@ async function handleToolCall(
     }
   }
 
-  // Confirmacion: la maneja el AGENTE en prosa (prompt: "antes de crear/editar/
-  // eliminar, describi la accion y pedi confirmacion explicita"). El gate de
-  // doble-pasada del runtime se removio porque se acumulaba con la pregunta en
-  // prosa del agente -> el usuario terminaba confirmando 2-3 veces y el modelo
-  // se confundia (decia "check-in realizado" sin ejecutar). Ahora: el usuario
-  // pide -> el agente describe y pregunta -> el usuario confirma -> el agente
-  // llama el write UNA vez y ejecuta de inmediato, devolviendo el resultado real.
-  if (tool.permissions.requiresConfirmation && session.pendingConfirmation) {
-    session.pendingConfirmation = null;
+  // ── Confirmacion ─────────────────────────────────────────────────────────
+  // Dos regimenes, a proposito (ver confirmationPolicy.ts):
+  //
+  //  (a) La mayoria de las escrituras: la confirmacion la maneja el AGENTE en
+  //      prosa. El gate de doble-pasada sobre TODA tool con requiresConfirmation
+  //      se removio en su momento porque se acumulaba con la pregunta en prosa
+  //      -> el usuario confirmaba 2-3 veces y el modelo se perdia. No volver.
+  //
+  //  (b) Borrados y acciones irreversibles: gate DURO. El runtime no ejecuta:
+  //      guarda la llamada pendiente y devuelve una tarjeta que el chat
+  //      renderiza con boton Confirmar (y, si es irreversible, un campo donde
+  //      hay que escribir el nombre del recurso). El modelo no puede saltearlo
+  //      porque no es una instruccion del prompt: es el runtime el que corta.
+  const confirmation = confirmationFor(tool as any, input);
+  if (confirmation.level !== "none") {
+    const confirmationId = `cfm-${randomUUID()}`;
+    session.pendingConfirmation = {
+      toolId: tool.toolId,
+      toolName: tool.name,
+      inputArgs: input,
+      requestedAt: new Date(),
+      confirmationId,
+      level: confirmation.level,
+      subjectArg: confirmation.subjectArg ?? "",
+      subjectValue: confirmation.subjectValue ?? "",
+      reason: confirmation.reason,
+      displayName: tool.displayName ?? tool.name,
+      expiresAt: new Date(Date.now() + CONFIRMATION_TTL_MS),
+    } as any;
     await session.save();
+
+    const output = {
+      status: "confirmation_required",
+      confirmationId,
+      tool: tool.name,
+      displayName: tool.displayName ?? tool.name,
+      level: confirmation.level,
+      reason: confirmation.reason,
+      subjectValue: confirmation.level === "typed" ? confirmation.subjectValue : undefined,
+      args: input,
+      message:
+        confirmation.level === "typed"
+          ? `NO se ejecuto nada. "${tool.displayName ?? tool.name}" es irreversible, asi que el usuario tiene que confirmarlo en una tarjeta escribiendo "${confirmation.subjectValue}". La tarjeta ya esta en pantalla: explicale en una o dos frases QUE se va a borrar o cambiar y que no hay vuelta atras, y esperá. NO vuelvas a llamar esta tool ni ninguna otra para esto.`
+          : `NO se ejecuto nada. "${tool.displayName ?? tool.name}" borra informacion, asi que el usuario lo confirma en una tarjeta que ya esta en pantalla. Explicale en una frase que se va a borrar y esperá. NO vuelvas a llamar esta tool.`,
+    };
+    return {
+      output,
+      execMeta: {
+        toolId: tool.toolId,
+        toolName: tool.name,
+        inputArgs: input,
+        outcome: "success",
+        // El payload completo va al `result` porque de ahí lo saca el chat para
+        // dibujar la tarjeta (`blocksFromMessage`). Si acá quedara un resumen,
+        // el usuario vería la explicación del agente sin el botón para confirmar.
+        result: output,
+        durationMs: Date.now() - start,
+        retried: false,
+      },
+    };
   }
 
   // Reintentos: solo GET (1 retry, 500ms backoff). NUNCA reintentamos

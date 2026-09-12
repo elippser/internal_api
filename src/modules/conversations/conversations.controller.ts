@@ -173,6 +173,7 @@ export const conversationsController = {
         req.params.id,
         value.toolName,
         value.args,
+        { confirmationId: value.confirmationId, confirmText: value.confirmText },
       );
       return ok(res, result);
     } catch (err) {

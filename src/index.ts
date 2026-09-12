@@ -17,6 +17,7 @@ import { toolsRouter } from "./modules/tools/tools.router";
 import { knowledgeRouter } from "./modules/knowledge/knowledge.router";
 import { feedbackRouter } from "./modules/feedback/feedback.router";
 import { conversationsRouter } from "./modules/conversations/conversations.router";
+import { growthRouter } from "./modules/growth/growth.router";
 import { startSessionExpiryJob } from "./modules/conversations/services/sessionExpiryJob";
 import { ticketsRouter } from "./modules/tickets/tickets.router";
 import { startTicketingCron } from "./modules/tickets/ticketingCron";
@@ -45,6 +46,7 @@ import {
 import { mktprojectRouter } from "./modules/mktproject/mktproject.router";
 import { dnsRouter } from "./modules/dns/dns.router";
 import { infraRouter } from "./modules/infra/infra.router";
+import { architectureRouter } from "./modules/architecture/architecture.router";
 import {
   publicNpsRouter,
   reputationRouter,
@@ -151,6 +153,8 @@ app.use(`${BASE}/tools`, toolsRouter);
 app.use(`${BASE}/knowledge`, knowledgeRouter);
 app.use(`${BASE}/feedback`, feedbackRouter);
 app.use(`${BASE}/conversations`, conversationsRouter);
+// Planes de crecimiento del turno estrategico (ver modules/growth).
+app.use(`${BASE}/growth`, growthRouter);
 app.use(`${BASE}/tickets`, ticketsRouter);
 app.use(`${BASE}/hotels`, hotelsRouter);
 app.use(`${BASE}/access`, accessRouter);
@@ -179,6 +183,10 @@ app.use(`${BASE}/mkt/dns`, dnsRouter);
 // deploy. Prefijo propio y no bajo /mkt como DNS — la zona es del dominio del
 // sitio publico, pero esto es el stack entero (Vercel + Coolify). Solo lectura.
 app.use(`${BASE}/infra`, infraRouter);
+// Arquitectura: el complemento estatico de /infra. Aquel pregunta "como esta
+// ahora" y sale a la red; este responde "como esta hecho" leyendo tablas del
+// propio bundle, asi que no gasta presupuesto ni depende de ningun token.
+app.use(`${BASE}/architecture`, architectureRouter);
 app.use(`${BASE}/reputation`, reputationRouter);
 app.use(`${BASE}/loyalty`, loyaltyRouter);
 

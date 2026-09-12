@@ -17,7 +17,7 @@ import {
 
 /**
  * Connector `rss` (spec v2 §5): blog / changelog / news por feed publico.
- * Usa las watchedPages kind blog|changelog con feedUrl (o lo descubre). Haiku
+ * Usa las watchedPages kind blog|changelog con feedUrl (o lo descubre). El tier barato
  * clasifica SOLO los posts nuevos desde la ultima corrida.
  */
 
@@ -27,7 +27,7 @@ const DAY_MS = 86_400_000;
 export const rssConnector: SignalConnector = {
   id: "rss",
   label: "Blog / changelog (RSS)",
-  paid: true, // Haiku sobre posts nuevos (centavos)
+  paid: true, // tier barato sobre posts nuevos (centavos)
   accepts: { pageKinds: ["blog", "changelog"] },
   async healthCheck() {
     return { ok: true, detail: "feeds públicos, sin key" };

@@ -8,6 +8,12 @@ import {
   AgentJwtError,
 } from "../../../shared/agentAuth/agentJwt";
 import { checkToolCall, resolveScopeForSession } from "./toolAccess";
+import { normalizeToolSchema } from "../../../shared/llm/toolSchema";
+import {
+  BUILDER_EDITOR_TOOLS,
+  BuilderEditError,
+  runBuilderTool,
+} from "./builderEditor";
 
 export interface AnthropicTool {
   name: string;
@@ -138,14 +144,21 @@ export async function resolveTools(
     toolId: { $in: enabledToolIds },
     status: "active",
   });
+  // Los esquemas vienen de documentos de la base: cualquiera puede agregar una
+  // tool con un array sin `items`, y eso NO rompe esa tool — rompe el turno
+  // entero, porque las doscientas y pico de declaraciones viajan juntas en el
+  // mismo pedido y Google contesta 400 al request completo. Anthropic lo
+  // toleraba, así que el defecto puede estar guardado hace meses sin dar señal.
+  // Se completa en la frontera; el arreglo de fondo es que la definición lo
+  // declare bien (`npm run audit:tool-schemas` las lista).
   return tools.map((t) => ({
     name: t.name,
     description: t.description ?? "",
-    input_schema: {
-      type: "object",
+    input_schema: normalizeToolSchema({
+      type: "object" as const,
       properties: t.inputSchema?.properties ?? {},
       required: t.inputSchema?.required ?? [],
-    },
+    }),
   }));
 }
 
@@ -350,6 +363,42 @@ export async function executeTool(
           { code: decision.code, reason: decision.reason },
         );
       }
+    }
+  }
+
+  // Edicion quirurgica del web builder: no es un passthrough. Estas tools hacen
+  // read-modify-write del arbol de componentes dentro de builderEditor y solo
+  // dejan tocar hojas que ya existen (ver el comentario de cabecera de ese
+  // modulo). La politica de acceso ya corrio arriba usando el pathTemplate
+  // declarado — que es el endpoint real que terminan escribiendo.
+  if (BUILDER_EDITOR_TOOLS.has(tool.name)) {
+    let builderJwt: string | undefined;
+    if (ctx.userId) {
+      try {
+        builderJwt = await mintAgentJwt({
+          userId: ctx.userId,
+          companyId: ctx.companyId,
+          agentId: ctx.agentId,
+          sessionId: ctx.sessionId,
+        });
+      } catch (err) {
+        if (err instanceof AgentJwtError) {
+          throw new ToolExecutionError("config", 500, err.message);
+        }
+        throw err;
+      }
+    }
+    try {
+      return await runBuilderTool(tool.name, args, { agentJwt: builderJwt });
+    } catch (err) {
+      if (err instanceof BuilderEditError) {
+        throw new ToolExecutionError("validation", 400, err.message);
+      }
+      if (err instanceof PmsProxyError) {
+        const kind = err.status === 502 ? "network" : mapStatusToKind(err.status);
+        throw new ToolExecutionError(kind, err.status, err.message, err.upstream);
+      }
+      throw err;
     }
   }
 

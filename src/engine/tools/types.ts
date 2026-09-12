@@ -12,6 +12,7 @@
  * defectos simétricos: intentar ejecutar localmente algo que ya corrió del otro
  * lado, o declarar como pasiva una herramienta que nadie va a ejecutar.
  */
+import { normalizeToolSchema } from "../../shared/llm/toolSchema";
 import type { ConcurrencyMode, ToolScope, ToolType } from "../models/enums";
 
 export interface JsonSchemaObject {
@@ -95,7 +96,12 @@ export function toProviderDefinition(tool: ResolvedTool): Record<string, unknown
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: tool.inputSchema,
+    // Mismo criterio que `sanitizeToolName` de acá abajo: lo que el proveedor
+    // exige y nuestra definición puede no traer se completa en la frontera, no
+    // se confía en que doscientas definiciones estén todas bien. Un array sin
+    // `items` es un 400 de Google que se lleva puesto el pedido ENTERO —
+    // Anthropic lo aceptaba, así que el defecto puede llevar meses guardado.
+    input_schema: normalizeToolSchema(tool.inputSchema),
   };
 }
 

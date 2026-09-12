@@ -49,9 +49,9 @@ import { getStaleDays } from "./settings.service";
 
 /**
  * Asistente de carga v2 (spec v1 §6 + v2 §7): baja home + pricing page,
- * extrae un borrador JSON CON CITAS por campo (Haiku), descubre perfiles
+ * extrae un borrador JSON CON CITAS por campo (tier barato), descubre perfiles
  * sociales / paginas a vigilar / feeds desde los links (sin LLM), y
- * opcionalmente busca evidencia externa con Sonnet + web_search.
+ * opcionalmente busca evidencia externa con el tier estandar + web_search.
  * El borrador NUNCA pisa datos solo: se aplica campo por campo desde la UI y
  * cada aplicacion deja procedencia (`meta`) con la cita.
  */
@@ -467,7 +467,7 @@ export async function startDraft(
   opts: { includeEvidence: boolean; userId: string | null },
 ) {
   if (!aiAvailable()) {
-    throw new CiError(503, "IA no disponible: falta ANTHROPIC_API_KEY", "ai_unavailable");
+    throw new CiError(503, "IA no disponible: falta OPENROUTER_API_KEY", "ai_unavailable");
   }
   const doc = await Competitor.findOne({ competitorId });
   if (!doc) throw new CiError(404, "Competidor no encontrado", "not_found");

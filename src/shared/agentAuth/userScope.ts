@@ -63,6 +63,35 @@ export interface UserScope {
   resolved: boolean;
   /** Password temporal pendiente: el PMS rechaza todo salvo cambiarla. */
   mustChangePassword: boolean;
+  /**
+   * Cuánto sabe de hotelería la PERSONA (no el rol ni la empresa).
+   *
+   * Calibra el vocabulario y la profundidad de lo que el agente propone: a un
+   * dueño primerizo hay que explicarle qué es el ADR la primera vez que se
+   * nombra; a un revenue manager, explicárselo es hacerle perder el tiempo.
+   *
+   * Viaja acá y no en la memoria del agente a propósito: la memoria tiene
+   * alcance de ESPACIO OPERATIVO (es del equipo), y el nivel de experiencia es
+   * de la persona. Guardarlo como memoria haría que el nivel del recepcionista
+   * nuevo calibre las respuestas que recibe el dueño.
+   *
+   * Default `basico` cuando el PMS no lo informa: nunca asumir el nivel más
+   * alto, que es el único error de los cuatro que deja al usuario sin entender
+   * la respuesta.
+   */
+  experienceLevel: ExperienceLevel;
+}
+
+export const EXPERIENCE_LEVELS = [
+  "sin_experiencia",
+  "basico",
+  "intermedio",
+  "avanzado",
+] as const;
+export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
+
+export function isExperienceLevel(v: unknown): v is ExperienceLevel {
+  return typeof v === "string" && (EXPERIENCE_LEVELS as readonly string[]).includes(v);
 }
 
 interface UserProfileResponse {
@@ -77,6 +106,9 @@ interface UserProfileResponse {
   activeOperativeSpaceId?: string;
   spacePermissions?: SpacePermissionsClaim;
   mustChangePassword?: boolean;
+  /** `User.hospitality.experienceLevel` en pms-core. Puede no venir. */
+  hospitality?: { experienceLevel?: string };
+  experienceLevel?: string;
 }
 
 const CACHE_TTL_MS = 60_000;
@@ -126,6 +158,7 @@ export function emptyScope(userId: string, companyId?: string): UserScope {
     propertyIds: [],
     resolved: false,
     mustChangePassword: false,
+    experienceLevel: "basico",
   };
 }
 
@@ -178,6 +211,11 @@ function scopeFromProfile(
     space,
     resolved: true,
     mustChangePassword: p.mustChangePassword === true,
+    experienceLevel: isExperienceLevel(p.hospitality?.experienceLevel)
+      ? p.hospitality.experienceLevel
+      : isExperienceLevel(p.experienceLevel)
+        ? p.experienceLevel
+        : "basico",
   };
 }
 

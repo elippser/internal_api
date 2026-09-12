@@ -25,24 +25,24 @@ export const AGENT_CHANNELS = [
 ] as const;
 
 // Modelos seleccionables por agente (referencia para la UI). El runtime acepta
-// cualquier string; esta lista es la curada que ofrecemos. La tabla de precios
-// (usage.pricing.ts) matchea por familia (opus/sonnet/haiku), asi que el costo
-// se calcula bien para cualquiera de estos.
+// cualquier string; esta lista es la curada que ofrecemos, y son los tres tiers
+// de shared/llm/provider.ts. La tabla de precios (usage.pricing.ts) tiene una
+// fila por cada uno, asi que el costo se calcula bien para cualquiera.
 export const SELECTABLE_AGENT_MODELS = [
   {
-    value: "claude-haiku-4-5-20251001",
-    label: "Haiku 4.5",
-    hint: "Rapido y economico · ideal para chats simples",
+    value: "deepseek/deepseek-v4-flash-0731",
+    label: "DeepSeek V4 Flash",
+    hint: "Rapido y economico · USD 0,065/0,18 por 1M · sin vision",
   },
   {
-    value: "claude-sonnet-4-6",
-    label: "Sonnet 4.6",
-    hint: "Balanceado · capacidad/costo",
+    value: "z-ai/glm-5.3-flash",
+    label: "GLM 5.3 Flash",
+    hint: "Balanceado · USD 0,075/0,25 por 1M · con vision",
   },
   {
-    value: "claude-opus-4-8",
-    label: "Opus 4.8",
-    hint: "Maxima capacidad · tareas complejas",
+    value: "google/gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
+    hint: "Maxima capacidad · USD 0,75/3,75 por 1M · con vision",
   },
 ] as const;
 

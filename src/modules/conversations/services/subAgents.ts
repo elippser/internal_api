@@ -1,8 +1,8 @@
 // Sub-agentes operativos / de consulta de roombir-IA.
 //
 // Cada turno del chat se enruta (ver taskRouter) a UNO de estos perfiles segun
-// la complejidad real de la tarea, para no pagar Opus por algo trivial ni
-// mandar a Haiku algo que requiere razonamiento. Viven en el MISMO chat:
+// la complejidad real de la tarea, para no pagar el tier caro por algo trivial ni
+// mandar al tier barato algo que requiere razonamiento. Viven en el MISMO chat:
 // comparten sesion, historial, tools habilitadas del agente y memoria de largo
 // plazo. Lo unico que cambia entre sub-agentes es:
 //   - el MODELO (tier de costo/capacidad),
@@ -11,7 +11,7 @@
 //
 // El piso operativo del runner (applyOperationalFloor) sigue siendo la red de
 // seguridad: si un turno termina con tools de escritura, el modelo nunca baja
-// de Sonnet aunque el router se equivoque.
+// del tier estandar aunque el router se equivoque.
 
 export type SubAgentId = "consulta" | "operativo" | "analista";
 export type SubAgentTier = "quick" | "standard" | "deep";
@@ -25,7 +25,7 @@ export interface SubAgentProfile {
   model: string;
   /** "read" = solo tools de lectura este turno; "all" = todas las del agente. */
   toolScope: "read" | "all";
-  /** Habilita la búsqueda web nativa de Anthropic (solo tiers Sonnet/Opus). */
+  /** Habilita la búsqueda web nativa (server tool). */
   webSearch: boolean;
   /** Habilita ejecución de código (genera imágenes/gráficos y documentos). */
   codeExec: boolean;
@@ -33,12 +33,14 @@ export interface SubAgentProfile {
   specialization: string;
 }
 
+import { modelFor } from "../../../shared/llm/provider";
+
 // Modelos por tier. Configurables por env para ajustar costo sin tocar codigo.
-const MODEL_QUICK =
-  process.env.SUBAGENT_MODEL_QUICK ?? "claude-haiku-4-5-20251001";
-const MODEL_STANDARD =
-  process.env.SUBAGENT_MODEL_STANDARD ?? "claude-sonnet-4-6";
-const MODEL_DEEP = process.env.SUBAGENT_MODEL_DEEP ?? "claude-opus-4-8";
+// Los defaults salen de shared/llm/provider.ts, que es donde estan los precios
+// y el porque de cada eleccion.
+const MODEL_QUICK = process.env.SUBAGENT_MODEL_QUICK ?? modelFor("cheap");
+const MODEL_STANDARD = process.env.SUBAGENT_MODEL_STANDARD ?? modelFor("standard");
+const MODEL_DEEP = process.env.SUBAGENT_MODEL_DEEP ?? modelFor("premium");
 
 export const SUB_AGENTS: Record<SubAgentId, SubAgentProfile> = {
   consulta: {
@@ -123,7 +125,7 @@ export const SUB_AGENTS: Record<SubAgentId, SubAgentProfile> = {
 };
 
 // Sub-agente por defecto cuando el router no puede decidir con confianza.
-// Elegimos "operativo" (Sonnet, todas las tools) a proposito: nunca dejamos una
+// Elegimos "operativo" (tier estandar, todas las tools) a proposito: nunca dejamos una
 // tarea potencialmente operativa en manos del tier mas debil.
 export const DEFAULT_SUB_AGENT: SubAgentId = "operativo";
 

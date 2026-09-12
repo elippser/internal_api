@@ -12,7 +12,7 @@ import { getSettings } from "../settings.service";
 /**
  * Deteccion automatica de menciones (spec v2 §9): busca aliases de los
  * competidores en los mensajes ENTRANTES de WhatsApp (mkt_conversations) y en
- * las notas del CRM (mkt_accounts) nuevos desde el ultimo scan; Haiku confirma
+ * las notas del CRM (mkt_accounts) nuevos desde el ultimo scan; el tier barato confirma
  * y clasifica el contexto; se propone como sugerencia `mentions` + item del
  * radar kind `mention`. Nunca escribe la mencion sola.
  */
@@ -67,7 +67,7 @@ interface Candidate {
 
 export async function scanMentions(opts: { trigger: "cron" | "manual"; userId?: string | null }) {
   const settings = await getSettings();
-  if (!aiAvailable()) throw new CiError(503, "IA no disponible: falta ANTHROPIC_API_KEY", "ai_unavailable");
+  if (!aiAvailable()) throw new CiError(503, "IA no disponible: falta OPENROUTER_API_KEY", "ai_unavailable");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const md: any = settings.mentionDetection ?? {};
   if (opts.trigger === "cron" && md.enabled === false) return { skipped: "mentionDetection.enabled=false" };

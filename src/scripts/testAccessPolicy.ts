@@ -32,6 +32,7 @@ const base = (over: Partial<UserScope>): UserScope => ({
   userId: "u1",
   companyId: "c1",
   role: "staff",
+  experienceLevel: "basico",
   isAdmin: false,
   capabilities: [],
   allProperties: true,

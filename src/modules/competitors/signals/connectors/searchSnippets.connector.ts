@@ -15,7 +15,7 @@ import {
 } from "./types";
 
 /**
- * Connector `search_snippets` (spec v2 §5): Sonnet + web_search (variante
+ * Connector `search_snippets` (spec v2 §5): tier estandar + web_search (variante
  * estable, ver ciLlm) para las redes SIN API (Instagram, LinkedIn, X,
  * Facebook, TikTok): followers/posts aproximados desde los snippets de Google
  * ("12.3K Followers · 480 Posts"), y noticias/funding de los ultimos 30 dias.
@@ -51,7 +51,9 @@ export const searchSnippetsConnector: SignalConnector = {
   paid: true,
   accepts: { networks: SNIPPET_NETWORKS, perCompetitor: true },
   async healthCheck() {
-    return process.env.ANTHROPIC_API_KEY ? { ok: true, detail: "Sonnet + web_search (≈ USD 0,10-0,15 por competidor)" } : { ok: false, detail: "falta ANTHROPIC_API_KEY" };
+    return process.env.OPENROUTER_API_KEY
+      ? { ok: true, detail: "tier estandar + web_search (≈ USD 0,03-0,05 por competidor)" }
+      : { ok: false, detail: "falta OPENROUTER_API_KEY" };
   },
   async run(ctx: SignalContext): Promise<SignalConnectorResult> {
     if (!ctx.allowPaid) return emptyResult(emptyUsage(), { skipped: "presupuesto mensual agotado" });

@@ -1,22 +1,25 @@
-import Anthropic from "@anthropic-ai/sdk";
+import {
+  getLlmClient,
+  modelFor,
+  thinkingBlockFor,
+  withReasoningHeadroom,
+} from "../../shared/llm/provider";
 import { makeId } from "../../shared/utils/ids";
 import { AgentMemory, sanitizeMemory, type MemoryKind } from "./memory.model";
 
 // Modelo barato para destilar memoria (no necesita razonar mucho).
-const MEMORY_MODEL =
-  process.env.MEMORY_MODEL ?? "claude-haiku-4-5-20251001";
+const MEMORY_MODEL = process.env.MEMORY_MODEL ?? modelFor("cheap");
 const MAX_MEMORIES_IN_PROMPT = 25;
 
 function distillEnabled(): boolean {
   return process.env.MEMORY_DISTILL_ENABLED !== "off";
 }
 
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
-  if (!cachedClient) cachedClient = new Anthropic({ apiKey: key });
-  return cachedClient;
+// El destilado es best-effort: sin key no se rompe nada, simplemente no se
+// guarda memoria. Por eso devuelve null en vez de lanzar.
+function getClient() {
+  if (!process.env.OPENROUTER_API_KEY && !process.env.ANTHROPIC_API_KEY) return null;
+  return getLlmClient();
 }
 
 interface Scope {
@@ -100,9 +103,17 @@ export const memoryService = {
         ? existing.map((m) => `- ${m}`).join("\n")
         : "(ninguna todavia)";
 
+      // El destilado quiere un array JSON corto, no razonamiento. Los modelos
+      // del catalogo nuevo piensan por defecto y esos tokens salen del MISMO
+      // presupuesto de salida: con los 400 de antes se los gastaban pensando y
+      // devolvian un mensaje sin bloque de texto, o sea "no hay nada que
+      // recordar" en cada intercambio. Se apaga donde se puede y se deja aire
+      // donde no.
+      const thinking = thinkingBlockFor(MEMORY_MODEL, { enabled: false });
       const res = await client.messages.create({
         model: MEMORY_MODEL,
-        max_tokens: 400,
+        max_tokens: withReasoningHeadroom(MEMORY_MODEL, 400),
+        ...(thinking ? { thinking } : {}),
         system:
           "Sos un extractor de memoria de largo plazo para un asistente de operaciones hoteleras. " +
           "Dado un intercambio (usuario + asistente), devolves SOLO hechos durables que valga la pena " +

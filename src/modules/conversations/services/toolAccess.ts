@@ -407,6 +407,7 @@ export async function resolveScopeForSession(ctx: {
       propertyIds: [],
       resolved: false,
       mustChangePassword: false,
+      experienceLevel: "basico",
     };
   }
   return resolveUserScope(secret, ctx.userId, ctx.companyId);

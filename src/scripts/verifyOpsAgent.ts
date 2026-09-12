@@ -31,9 +31,9 @@ import type { UserScope } from "../shared/agentAuth/userScope";
 /** Fallos acumulados: el script sale con codigo 1 si hay alguno. */
 const problems: string[] = [];
 
-function check(label: string, ok: boolean): void {
-  if (!ok) problems.push(label);
-  console.log(`  ${ok ? "OK   " : "FALLA"} ${label}`);
+function check(label: string, ok: boolean, detail?: string): void {
+  if (!ok) problems.push(detail ? `${label} — ${detail}` : label);
+  console.log(`  ${ok ? "OK   " : "FALLA"} ${label}${!ok && detail ? ` — ${detail}` : ""}`);
 }
 
 async function main() {
@@ -135,7 +135,26 @@ async function main() {
     declared: agent.skillNames,
   });
   console.log(`\n  load_skill("comp-set-y-competencia") -> ok=${body.ok} bytes=${body.body?.length ?? 0}`);
-  check("las 5 habilidades de revenue resuelven", skills.length === 5);
+  // Antes esto era `skills.length === 5` y se rompió al sumar las habilidades
+  // base: un conteo fijo falla cada vez que se agrega una habilidad legítima y
+  // no dice nada cuando falta justo la que importa. Verificamos presencia por
+  // nombre, que es lo que de verdad tiene que cumplirse.
+  const resolved = new Set(skills.map((s) => s.name));
+  const REQUIRED_SKILLS = [
+    // Revenue (seed:revenue-skills)
+    "revision-de-revenue",
+    "comp-set-y-competencia",
+    // Base (seed:base-skills) — el guardarraíl de borrados es el crítico.
+    "acciones-irreversibles",
+    "editar-una-pagina-web",
+    "permisos-y-espacio-operativo",
+  ];
+  const missingSkills = REQUIRED_SKILLS.filter((n) => !resolved.has(n));
+  check(
+    `resuelven las habilidades obligatorias (${skills.length} declaradas en total)`,
+    missingSkills.length === 0,
+    missingSkills.join(", "),
+  );
   check("load_skill devuelve el cuerpo", body.ok === true);
   check(
     "la habilidad de comp-set trae la regla de precedencia",
@@ -150,10 +169,12 @@ async function main() {
   const ownerScope: UserScope = {
     userId: "u-owner", companyId: "c", role: "owner", isAdmin: true,
     capabilities: [] as any, allProperties: true, propertyIds: [], resolved: true, mustChangePassword: false,
+    experienceLevel: "avanzado",
   };
   const recepScope: UserScope = {
     userId: "u-staff", companyId: "c", role: "staff", isAdmin: false, capabilities: [],
     allProperties: true, propertyIds: [], resolved: true, mustChangePassword: false,
+    experienceLevel: "basico",
     space: { spaceId: "s", propertyId: "p", isAdmin: false, apps: [
       { appId: "todas-reservas", access: "operate" }, { appId: "panel-reservas", access: "operate" },
       { appId: "carga-manual", access: "operate" }, { appId: "estado-habitaciones", access: "operate" },

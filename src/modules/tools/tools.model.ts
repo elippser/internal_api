@@ -110,6 +110,15 @@ const permissionsSchema = new Schema(
     },
     requiresConfirmation: { type: Boolean, default: false },
     isDestructive: { type: Boolean, default: false },
+    // IRREVERSIBLE: no hay deshacer y el dato no se recupera (vaciar un sitio,
+    // confirmar una migracion, quitar un dominio). Ademas de la tarjeta de
+    // confirmacion, el runtime exige que el usuario ESCRIBA el valor del
+    // argumento nombrado en `confirmSubject` — igual que GitHub pide tipear el
+    // nombre del repo. Sin eso la accion no se ejecuta: ver el gate en
+    // conversationRunner + conversations.service.executeAction.
+    irreversible: { type: Boolean, default: false },
+    /** Nombre del argumento cuyo valor el usuario tiene que re-escribir. */
+    confirmSubject: { type: String, default: "" },
   },
   { _id: false },
 );
@@ -796,7 +805,7 @@ export const INITIAL_TOOLS = [
     description: "Elimina una propiedad de la company. Accion irreversible y solo dueño.",
     inputSchema: obj({ ...PROPERTY_PARAM }),
     execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/api/v1/properties/{propertyId}" },
-    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: true },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "propertyId" },
   },
   {
     toolId: "tool-067",
@@ -868,7 +877,7 @@ export const INITIAL_TOOLS = [
     description: "Elimina un espacio operativo. Accion irreversible.",
     inputSchema: obj({ ...PROPERTY_PARAM, spaceId: { type: "string" } }, ["spaceId"]),
     execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/api/v1/properties/{propertyId}/spaces/{spaceId}" },
-    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "spaceId" },
   },
   {
     toolId: "tool-074",
@@ -1210,7 +1219,7 @@ export const INITIAL_TOOLS = [
     displayName: "Reordenar galerias",
     category: "marketing_write",
     description: "Cambia el orden de las galerias.",
-    inputSchema: obj({ ...PROPERTY_PARAM, order: { type: "array", description: "Lista de galleryId en el nuevo orden." } }),
+    inputSchema: obj({ ...PROPERTY_PARAM, order: { type: "array", items: { type: "string" }, description: "Lista de galleryId en el nuevo orden." } }),
     execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/api/v1/properties/{propertyId}/galleries/reorder" },
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: false, isDestructive: false },
   },
@@ -1240,7 +1249,7 @@ export const INITIAL_TOOLS = [
     displayName: "Reordenar media de galeria",
     category: "marketing_write",
     description: "Cambia el orden de las imagenes de una galeria.",
-    inputSchema: obj({ ...PROPERTY_PARAM, galleryId: { type: "string" }, order: { type: "array" } }, ["galleryId"]),
+    inputSchema: obj({ ...PROPERTY_PARAM, galleryId: { type: "string" }, order: { type: "array", items: { type: "string" } } }, ["galleryId"]),
     execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/api/v1/properties/{propertyId}/galleries/{galleryId}/media/reorder" },
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: false, isDestructive: false },
   },
@@ -1358,9 +1367,9 @@ export const INITIAL_TOOLS = [
     displayName: "Eliminar reseñas en lote",
     category: "marketing_write",
     description: "Elimina varias reseñas a la vez. Accion irreversible.",
-    inputSchema: obj({ ...PROPERTY_PARAM, reviewIds: { type: "array", description: "Lista de reviewId a eliminar." } }, ["reviewIds"]),
+    inputSchema: obj({ ...PROPERTY_PARAM, reviewIds: { type: "array", items: { type: "string" }, description: "Lista de reviewId a eliminar." } }, ["reviewIds"]),
     execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/reviews/bulk-delete" },
-    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "propertyId" },
   },
 
   // ===================== MARKETING: LIBRERIA DE ARCHIVOS (pms-core) =========
@@ -1595,7 +1604,7 @@ export const INITIAL_TOOLS = [
     description: "Elimina un PROYECTO web completo (incluye sus sitios y dominios). Accion irreversible.",
     inputSchema: obj({ siteId: { type: "string", description: "ID del proyecto (siteId)." } }, ["siteId"]),
     execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/site-data/{siteId}" },
-    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "siteId" },
   },
   {
     toolId: "tool-138",
@@ -1779,7 +1788,7 @@ export const INITIAL_TOOLS = [
     displayName: "Marcar notificaciones leidas",
     category: "settings_write",
     description: "Marca notificaciones como leidas.",
-    inputSchema: obj({ ids: { type: "array", description: "Lista de notificationId. Vacio = todas." } }),
+    inputSchema: obj({ ids: { type: "array", items: { type: "string" }, description: "Lista de notificationId. Vacio = todas." } }),
     execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/notifications/mark-read" },
     permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
   },
@@ -1901,7 +1910,7 @@ export const INITIAL_TOOLS = [
     description: "Aplica una migracion masiva de precios base a las categorias. Accion sensible.",
     inputSchema: obj({ ...PROPERTY_PARAM }),
     execution: { targetService: "rooms-app", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/categories/migrate-prices" },
-    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "propertyId" },
   },
   {
     toolId: "tool-167",
@@ -2380,7 +2389,7 @@ export const INITIAL_TOOLS = [
       "Cambia el orden de evaluacion. orderedIds es la lista COMPLETA de ruleId en el orden deseado. Cambia que regla gana ante un empate: AFECTA PRECIOS REALES.",
     inputSchema: obj({
       ...PROPERTY_PARAM,
-      orderedIds: { type: "array", description: "Lista completa de ruleId en el orden deseado." },
+      orderedIds: { type: "array", items: { type: "string" }, description: "Lista completa de ruleId en el orden deseado." },
     }, ["orderedIds"]),
     execution: { targetService: "rms-app", method: "POST", pathTemplate: "/api/v1/rms/rules/reorder?propertyId={propertyId}" },
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -2554,11 +2563,11 @@ export const INITIAL_TOOLS = [
     inputSchema: obj({
       ...PROPERTY_PARAM,
       radiusKm: { type: "number", description: "Radio de busqueda (1-200)." },
-      enabledCategories: { type: "array", description: "Categorias habilitadas." },
+      enabledCategories: { type: "array", items: { type: "string" }, description: "Categorias habilitadas." },
       lookaheadDays: { type: "number", description: "Dias hacia adelante (7-540)." },
       relevanceThreshold: { type: "number", description: "Umbral de relevancia 0-1 para destacar." },
       categoryWeights: { type: "object", description: "Peso 0-1 por categoria." },
-      icsFeeds: { type: "array", description: "Feeds iCal: [{ url, label, category }]." },
+      icsFeeds: { type: "array", items: { type: "object" }, description: "Feeds iCal: [{ url, label, category }]." },
       lat: { type: "number", description: "Latitud manual de la property." },
       lng: { type: "number", description: "Longitud manual." },
       countryCode: { type: "string", description: "Codigo de pais ISO de 2 letras." },
@@ -2591,7 +2600,7 @@ export const INITIAL_TOOLS = [
       "slotIntoCompset true los mete ademas en los 5 slots del comp-set activo.",
     inputSchema: obj({
       ...PROPERTY_PARAM,
-      candidates: { type: "array", description: "Candidatos elegidos, tal cual los devolvio discover_competitors (max 20)." },
+      candidates: { type: "array", items: { type: "object" }, description: "Candidatos elegidos, tal cual los devolvio discover_competitors (max 20)." },
       searchRadiusKm: { type: "number", description: "Radio con el que se busco. Opcional." },
       slotIntoCompset: { type: "boolean", description: "Ademas ocupar slots del comp-set (default false)." },
     }, ["candidates"]),
@@ -2610,7 +2619,7 @@ export const INITIAL_TOOLS = [
       ...PROPERTY_PARAM,
       label: { type: "string", description: "Nombre del competidor." },
       manualBarUsd: { type: "number", description: "Tarifa de referencia en USD. Opcional." },
-      otaListingUrls: { type: "array", description: "[{ ota: 'booking'|'expedia'|'airbnb'|'other', url }]. Opcional." },
+      otaListingUrls: { type: "array", items: { type: "object" }, description: "[{ ota: 'booking'|'expedia'|'airbnb'|'other', url }]. Opcional." },
       address: { type: "string", description: "Direccion. Opcional." },
       city: { type: "string", description: "Ciudad. Opcional." },
       lat: { type: "number", description: "Latitud. Opcional." },
@@ -2670,7 +2679,7 @@ export const INITIAL_TOOLS = [
     inputSchema: obj({
       ...PROPERTY_PARAM,
       externalCompetitorId: { type: "string", description: "ID del competidor." },
-      rates: { type: "array", description: "[{ date: 'YYYY-MM-DD', rate: <numero>, currency?: 'USD', roomType?: '...' }]." },
+      rates: { type: "array", items: { type: "object" }, description: "[{ date: 'YYYY-MM-DD', rate: <numero>, currency?: 'USD', roomType?: '...' }]." },
     }, ["externalCompetitorId", "rates"]),
     execution: { targetService: "rms-app", method: "POST", pathTemplate: "/api/v1/rms/external-competitors/{externalCompetitorId}/rates?propertyId={propertyId}" },
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -2700,7 +2709,7 @@ export const INITIAL_TOOLS = [
       "en las reglas, asi que reordenar cambia que compara cada regla.",
     inputSchema: obj({
       ...PROPERTY_PARAM,
-      competitors: { type: "array", description: "Lista completa de slots (max 5), en orden." },
+      competitors: { type: "array", items: { type: "object" }, description: "Lista completa de slots (max 5), en orden." },
     }, ["competitors"]),
     execution: { targetService: "rms-app", method: "PUT", pathTemplate: "/api/v1/rms/config/compset?propertyId={propertyId}" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -2722,7 +2731,7 @@ export const INITIAL_TOOLS = [
       roomCount: { type: "number", description: "Cantidad de habitaciones. Opcional." },
       city: { type: "string", description: "Ciudad. Opcional." },
       zone: { type: "string", description: "Zona/barrio. Opcional." },
-      amenities: { type: "array", description: "Lista de amenities. Opcional." },
+      amenities: { type: "array", items: { type: "string" }, description: "Lista de amenities. Opcional." },
     }),
     execution: { targetService: "rms-app", method: "PUT", pathTemplate: "/api/v1/rms/config/profile?propertyId={propertyId}" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -2918,7 +2927,7 @@ export const INITIAL_TOOLS = [
       "Ej. 'cerra la venta del 24 al 26 de diciembre' = un item por dia con closed:true. Confirma fechas y alcance antes de ejecutar: esto quita disponibilidad del motor.",
     inputSchema: obj({
       ...PROPERTY_PARAM,
-      items: { type: "array", description: "Lista de restricciones por dia (ver descripcion)." },
+      items: { type: "array", items: { type: "object" }, description: "Lista de restricciones por dia (ver descripcion)." },
     }, ["items"]),
     execution: { targetService: "booking-app", method: "PUT", pathTemplate: "/api/v1/day-restrictions/bulk" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3138,7 +3147,7 @@ export const INITIAL_TOOLS = [
       channel: { type: "string", description: "instagram | facebook | tiktok." },
       objective: { type: "string", description: "Objetivo/brief de la campaña." },
       count: { type: "number", description: "Cantidad de piezas." },
-      types: { type: "array", description: "Tipos de pieza (opcional)." },
+      types: { type: "array", items: { type: "string" }, description: "Tipos de pieza (opcional)." },
     }, ["channel"]),
     execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/assets/generate", timeout: 60000 },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3155,7 +3164,7 @@ export const INITIAL_TOOLS = [
       type: { type: "string", description: "Tipo de pieza (post, story, reel...)." },
       copy: { type: "string", description: "Texto/caption." },
       imageFileId: { type: "string", description: "fileId de la libreria (opcional)." },
-      hashtags: { type: "array", description: "Hashtags (opcional)." },
+      hashtags: { type: "array", items: { type: "string" }, description: "Hashtags (opcional)." },
     }, ["channel"]),
     execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/assets" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3170,7 +3179,7 @@ export const INITIAL_TOOLS = [
       ...PROPERTY_PARAM,
       assetId: { type: "string" },
       copy: { type: "string" },
-      hashtags: { type: "array" },
+      hashtags: { type: "array", items: { type: "string" } },
       imageFileId: { type: "string" },
       status: { type: "string" },
     }, ["assetId"]),
@@ -3210,9 +3219,9 @@ export const INITIAL_TOOLS = [
       ...PROPERTY_PARAM,
       business: { type: "object" },
       location: { type: "object" },
-      hours: { type: "array" },
-      attributes: { type: "array" },
-      photos: { type: "array" },
+      hours: { type: "array", items: { type: "object" } },
+      attributes: { type: "array", items: { type: "string" } },
+      photos: { type: "array", items: { type: "object" } },
     }),
     execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/gbp" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3251,7 +3260,7 @@ export const INITIAL_TOOLS = [
       platform: { type: "string", description: "booking | expedia | airbnb | tripadvisor." },
       description: { type: "object" },
       policies: { type: "object" },
-      roomTypes: { type: "array" },
+      roomTypes: { type: "array", items: { type: "object" } },
     }, ["platform"]),
     execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/otas/{platform}" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3397,7 +3406,7 @@ export const INITIAL_TOOLS = [
     inputSchema: obj({
       siteId: { type: "string" },
       subSiteId: { type: "string" },
-      popups: { type: "array", description: "Lista completa de popups." },
+      popups: { type: "array", items: { type: "object" }, description: "Lista completa de popups." },
     }, ["siteId", "subSiteId", "popups"]),
     execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/subsite/{subSiteId}/from/{siteId}/popups" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3579,9 +3588,9 @@ export const INITIAL_TOOLS = [
     inputSchema: obj({
       ...COMPANY_PARAM,
       userId: { type: "string", description: "Usuario a editar." },
-      capabilities: { type: "array", description: "Lista completa de capabilities." },
+      capabilities: { type: "array", items: { type: "string" }, description: "Lista completa de capabilities." },
       allProperties: { type: "boolean" },
-      propertyIds: { type: "array", description: "Propiedades habilitadas (si allProperties=false)." },
+      propertyIds: { type: "array", items: { type: "string" }, description: "Propiedades habilitadas (si allProperties=false)." },
     }, ["userId"]),
     execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/company/{companyId}/users/{userId}/access" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
@@ -3612,6 +3621,1240 @@ export const INITIAL_TOOLS = [
     }, ["q"]),
     execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/search" },
     permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ALCANCE TOTAL (2026-09-12): todo lo que la app hace, el agente lo hace.
+  //  Las secciones de abajo cierran los huecos que quedaban entre el menu del
+  //  PMS y el catalogo. `npm run verify:tool-coverage` recorre los routers
+  //  reales de los 4 servicios y falla si vuelve a abrirse uno.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ============ WEB BUILDER: CONTENIDO DE PAGINAS (edicion quirurgica) ======
+  // Estas SEIS tools no son passthrough: las resuelve `builderEditor.ts` con
+  // read-modify-write del arbol de componentes. El endpoint crudo que recibe el
+  // arbol entero NO se expone — pedirle al modelo que reproduzca cientos de KB
+  // de JSON es la forma seria de vaciar una pagina. Todo se escribe al
+  // BORRADOR; publicar es un paso aparte (publish_site_changes).
+  {
+    toolId: "tool-500",
+    name: "get_page_content",
+    displayName: "Leer el contenido de una pagina web",
+    category: "marketing_read",
+    description:
+      "Devuelve el contenido EDITABLE de una pagina del sitio: la lista de componentes (secciones) y un indice de cada texto, imagen y enlace con su `path`. " +
+      "Es el paso previo obligatorio a edit_page_content: los `path` que devuelve son los unicos que esa tool acepta. " +
+      "Si la pagina es grande, acotar con `componentIndex` (un solo componente) o `contains` (solo las hojas que contienen ese texto). " +
+      "Lee el BORRADOR si hay uno abierto; si no, lo publicado.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio (proyecto). Sale de list_site_projects." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma del sitio. Sale de list_site_projects / get_site_project." },
+      pageId: { type: "string", description: "ID de la pagina. Tambien acepta el nombre o la URL de la pagina (ej. 'home' o '/contacto')." },
+      componentIndex: { type: "number", description: "Opcional. Devolver solo las hojas de ese componente (indice de la lista `components`)." },
+      contains: { type: "string", description: "Opcional. Devolver solo las hojas cuyo texto contenga esto (busqueda sin distinguir mayusculas)." },
+    }, ["siteId", "subSiteId", "pageId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/subsite/{subSiteId}/from/{siteId}", timeout: 20000 },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-501",
+    name: "edit_page_content",
+    displayName: "Editar textos e imagenes de una pagina web",
+    category: "marketing_write",
+    description:
+      "Cambia valores concretos de una pagina: titulos, parrafos, botones, URLs de imagenes, precios escritos a mano. " +
+      "Cada cambio es un { path, value } con un `path` EXACTO de los que devolvio get_page_content — no inventes paths ni campos nuevos: " +
+      "esta tool solo reemplaza valores que ya existen y rechaza cualquier otra cosa, para que no se pueda romper la estructura de la pagina. " +
+      "Se guarda en el BORRADOR: la web publicada no cambia hasta llamar publish_site_changes. Si algo sale mal, discard_site_draft lo deshace.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio (proyecto)." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID, nombre o URL de la pagina." },
+      edits: {
+        type: "array",
+        description: "Lista de cambios. Maximo 60 por llamada.",
+        items: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Path exacto devuelto por get_page_content, ej. '2.props.title'." },
+            value: { type: "string", description: "Valor nuevo. Tiene que ser del mismo tipo que el actual (texto por texto, numero por numero)." },
+          },
+          required: ["path", "value"],
+        },
+      },
+    }, ["siteId", "subSiteId", "pageId", "edits"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/draft/{subSiteId}/from/{siteId}", timeout: 25000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-502",
+    name: "move_page_component",
+    displayName: "Reordenar una seccion de la pagina",
+    category: "marketing_write",
+    description:
+      "Mueve una seccion (componente) de la pagina a otra posicion y reindexa el orden de render. Los indices salen de get_page_content. Se guarda en el borrador.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID, nombre o URL de la pagina." },
+      from: { type: "number", description: "Indice actual de la seccion." },
+      to: { type: "number", description: "Indice al que se mueve." },
+    }, ["siteId", "subSiteId", "pageId", "from", "to"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/draft/{subSiteId}/from/{siteId}", timeout: 25000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-503",
+    name: "remove_page_component",
+    displayName: "Quitar una seccion de la pagina",
+    category: "marketing_write",
+    description:
+      "Quita una seccion (componente) de la pagina. Se guarda en el BORRADOR: la web publicada sigue igual y discard_site_draft lo revierte. " +
+      "Describi al usuario que seccion es antes de hacerlo.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID, nombre o URL de la pagina." },
+      componentIndex: { type: "number", description: "Indice de la seccion a quitar (de get_page_content)." },
+    }, ["siteId", "subSiteId", "pageId", "componentIndex"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/draft/{subSiteId}/from/{siteId}", timeout: 25000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-504",
+    name: "duplicate_page_component",
+    displayName: "Duplicar una seccion de la pagina",
+    category: "marketing_write",
+    description:
+      "Duplica una seccion y deja la copia justo despues de la original. Sirve para agregar otra tarjeta, otro bloque de servicio, otro testimonio: " +
+      "duplicas y despues editas la copia con edit_page_content. Se guarda en el borrador.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID, nombre o URL de la pagina." },
+      componentIndex: { type: "number", description: "Indice de la seccion a duplicar." },
+    }, ["siteId", "subSiteId", "pageId", "componentIndex"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/draft/{subSiteId}/from/{siteId}", timeout: 25000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-505",
+    name: "get_site_global_content",
+    displayName: "Leer el encabezado o el pie del sitio",
+    category: "marketing_read",
+    description:
+      "Contenido editable del encabezado (scope 'top') o del pie (scope 'bottom') del sitio: son globales, aparecen en TODAS las paginas. " +
+      "Mismo formato que get_page_content (componentes + hojas con path).",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      scope: { type: "string", description: "'top' para el encabezado, 'bottom' para el pie." },
+      contains: { type: "string", description: "Opcional. Filtra las hojas por texto." },
+    }, ["siteId", "subSiteId", "scope"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/subsite/{subSiteId}/from/{siteId}", timeout: 20000 },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-506",
+    name: "edit_site_global_content",
+    displayName: "Editar el encabezado o el pie del sitio",
+    category: "marketing_write",
+    description:
+      "Cambia textos, enlaces o imagenes del encabezado ('top') o del pie ('bottom'). OJO: afecta a TODAS las paginas del sitio. " +
+      "Mismas reglas que edit_page_content: paths exactos de get_site_global_content y se guarda en el borrador.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      scope: { type: "string", description: "'top' (encabezado) o 'bottom' (pie)." },
+      edits: {
+        type: "array",
+        description: "Lista de cambios { path, value }.",
+        items: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Path exacto devuelto por get_site_global_content." },
+            value: { type: "string", description: "Valor nuevo, del mismo tipo que el actual." },
+          },
+          required: ["path", "value"],
+        },
+      },
+    }, ["siteId", "subSiteId", "scope", "edits"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/draft/{subSiteId}/from/{siteId}", timeout: 25000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+
+  // ============ WEB BUILDER: PAGINAS, BORRADORES, IDIOMAS Y DOMINIOS ========
+  {
+    toolId: "tool-510",
+    name: "update_page_settings",
+    displayName: "Editar los datos de una pagina (SEO y estado)",
+    category: "marketing_write",
+    description:
+      "Actualiza los datos de la pagina (no su contenido): nombre, titulo, descripcion (meta description), URL, estado (indraft/active/inactive), " +
+      "imagen de previsualizacion social y configuracion de descubrimiento por IA. Para el contenido visible usa edit_page_content.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID de la pagina." },
+      name: { type: "string", description: "Nombre interno de la pagina." },
+      title: { type: "string", description: "Titulo (etiqueta <title> y SEO)." },
+      description: { type: "string", description: "Meta description." },
+      status: { type: "string", description: "indraft, active o inactive." },
+      urlPage: { type: "string", description: "URL de la pagina (ej. /contacto)." },
+      pageSocialPreview: { type: "string", description: "URL de la imagen para compartir en redes." },
+      aiDiscovery: { type: "object", description: "Descubrimiento por IA: pageIntent, pageTopic, semanticContext[], relatedEntities[], aiIndexing.allow." },
+    }, ["siteId", "subSiteId", "pageId"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/page/{pageId}/data/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-511",
+    name: "get_page_logic",
+    displayName: "Leer la logica de una pagina",
+    category: "marketing_read",
+    description: "Devuelve el bloque de logica (codigo del builder) de una pagina.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID de la pagina." },
+    }, ["siteId", "subSiteId", "pageId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/page/{pageId}/logic/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-512",
+    name: "update_page_logic",
+    displayName: "Guardar la logica de una pagina",
+    category: "marketing_write",
+    description:
+      "Reemplaza el bloque de logica de una pagina. Es codigo: leelo antes con get_page_logic y cambia lo minimo. " +
+      "Si el pedido del usuario se resuelve editando textos, usa edit_page_content en su lugar.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID de la pagina." },
+      logic: { type: "string", description: "Contenido completo de la logica." },
+    }, ["siteId", "subSiteId", "pageId", "logic"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/page/{pageId}/logic/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-513",
+    name: "get_site_header_logic",
+    displayName: "Leer la logica del encabezado",
+    category: "marketing_read",
+    description: "Bloque de logica del encabezado global (top) del sitio.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+    }, ["siteId", "subSiteId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/global/top-global/logic/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-514",
+    name: "update_site_header_logic",
+    displayName: "Guardar la logica del encabezado",
+    category: "marketing_write",
+    description: "Reemplaza la logica del encabezado global. Afecta a todas las paginas del sitio.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      topGlobalLogic: { type: "string", description: "Contenido completo de la logica del encabezado." },
+    }, ["siteId", "subSiteId", "topGlobalLogic"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/global/top-global/logic/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-515",
+    name: "get_site_footer_logic",
+    displayName: "Leer la logica del pie",
+    category: "marketing_read",
+    description: "Bloque de logica del pie global (bottom) del sitio.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+    }, ["siteId", "subSiteId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/global/bottom-global/logic/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-516",
+    name: "update_site_footer_logic",
+    displayName: "Guardar la logica del pie",
+    category: "marketing_write",
+    description: "Reemplaza la logica del pie global. Afecta a todas las paginas del sitio.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      bottomGlobalLogic: { type: "string", description: "Contenido completo de la logica del pie." },
+    }, ["siteId", "subSiteId", "bottomGlobalLogic"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/global/bottom-global/logic/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-518",
+    name: "get_site_draft",
+    displayName: "Ver si hay cambios sin publicar",
+    category: "marketing_read",
+    description:
+      "Borradores abiertos de una pagina: devuelve { page, top, bottom } con los componentes guardados y todavia NO publicados. " +
+      "Usalo para decirle al usuario que hay cambios pendientes antes de publicar.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID de la pagina." },
+    }, ["siteId", "subSiteId", "pageId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/drafts/{subSiteId}/from/{siteId}/page/{pageId}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-519",
+    name: "list_all_company_sites",
+    displayName: "Listar todos los sitios de la empresa",
+    category: "marketing_read",
+    description:
+      "Todos los sitios (proyectos) de la empresa con sus variantes de idioma. Vista completa; para el listado corto usa list_site_projects.",
+    inputSchema: obj({ ...COMPANY_PARAM }),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/company/{companyId}/all" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-520",
+    name: "get_site_language_variant",
+    displayName: "Ver una variante de idioma del sitio",
+    category: "marketing_read",
+    description: "Datos de la variante de idioma de un sitio (titulo, descripcion, estado, dominio, paginas).",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      language: { type: "string", description: "Codigo de idioma (es, en, pt, fr, de)." },
+    }, ["siteId", "language"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/site-data/{siteId}/languages/{language}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-521",
+    name: "update_site_language_variant",
+    displayName: "Editar una variante de idioma del sitio",
+    category: "marketing_write",
+    description: "Actualiza los datos de una variante de idioma: titulo, descripcion, estado, urlLang, dominio.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      language: { type: "string", description: "Codigo de idioma." },
+      title: { type: "string", description: "Titulo del sitio en ese idioma." },
+      description: { type: "string", description: "Descripcion en ese idioma." },
+      status: { type: "string", description: "Estado de la variante." },
+      urlLang: { type: "string", description: "Segmento de idioma en la URL." },
+      domain: { type: "string", description: "Dominio de la variante." },
+    }, ["siteId", "language"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/site-data/{siteId}/languages/{language}" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-522",
+    name: "create_page_translation",
+    displayName: "Crear la version de una pagina en otro idioma",
+    category: "marketing_write",
+    description:
+      "Copia una pagina de una variante de idioma a otra para traducirla. Despues se editan los textos con edit_page_content sobre la variante destino.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      sourceLanguage: { type: "string", description: "Idioma de origen (ej. es)." },
+      pageId: { type: "string", description: "ID de la pagina de origen." },
+      targetLanguage: { type: "string", description: "Idioma destino (ej. en)." },
+    }, ["siteId", "sourceLanguage", "pageId", "targetLanguage"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/site-data/{siteId}/{sourceLanguage}/pages/{pageId}/create-version/{targetLanguage}" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-523",
+    name: "add_site_domain",
+    displayName: "Conectar un dominio propio al sitio",
+    category: "marketing_write",
+    description:
+      "Agrega un dominio propio (custom hostname) a una variante del sitio. Despues hay que configurar el DNS y verificarlo con check_site_domain_dns. " +
+      "Decile al usuario que el dominio no funciona hasta que el DNS apunte correctamente.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      domain: { type: "string", description: "Dominio, sin protocolo (ej. www.mihotel.com)." },
+    }, ["siteId", "subSiteId", "domain"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/site-data/custom-hostnames/{subSiteId}/from/{siteId}", timeout: 20000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-524",
+    name: "delete_site_domain",
+    displayName: "Quitar un dominio propio del sitio",
+    category: "marketing_write",
+    description:
+      "Desconecta un dominio propio del sitio. El sitio deja de responder en ese dominio de inmediato. Confirmar siempre.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      customHostnameId: { type: "string", description: "ID del dominio (de list_site_domains)." },
+    }, ["siteId", "subSiteId", "customHostnameId"]),
+    execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/site-data/custom-hostnames/{customHostnameId}/from/{subSiteId}/from/{siteId}", timeout: 20000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "customHostnameId" },
+  },
+  {
+    toolId: "tool-525",
+    name: "check_site_domain_dns",
+    displayName: "Verificar el DNS de un dominio propio",
+    category: "marketing_write",
+    description:
+      "Vuelve a chequear el DNS de un dominio propio contra Cloudflare y devuelve el estado de verificacion. No cambia nada del sitio.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      customHostnameId: { type: "string", description: "ID del dominio." },
+    }, ["siteId", "subSiteId", "customHostnameId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/site-data/custom-hostnames/{customHostnameId}/check-dns/from/{subSiteId}/from/{siteId}", timeout: 20000 },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-526",
+    name: "reset_page_content",
+    displayName: "Vaciar el contenido de una pagina",
+    category: "marketing_write",
+    description:
+      "IRREVERSIBLE. Borra TODO el contenido de una pagina y la deja vacia. No hay deshacer y no toca el borrador: se pierde lo publicado. " +
+      "Antes de proponerlo, preguntale al usuario si no le alcanza con editar o quitar secciones puntuales.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma." },
+      pageId: { type: "string", description: "ID de la pagina a vaciar." },
+    }, ["siteId", "subSiteId", "pageId"]),
+    execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/site-data/reset-page/{pageId}/from/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "pageId" },
+  },
+  {
+    toolId: "tool-527",
+    name: "reset_site_variant_content",
+    displayName: "Vaciar una variante de idioma del sitio",
+    category: "marketing_write",
+    description:
+      "IRREVERSIBLE. Borra el contenido de TODAS las paginas de una variante de idioma del sitio. No hay deshacer.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio." },
+      subSiteId: { type: "string", description: "ID de la variante de idioma a vaciar." },
+    }, ["siteId", "subSiteId"]),
+    execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/site-data/reset/{subSiteId}/from/{siteId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "subSiteId" },
+  },
+  {
+    toolId: "tool-528",
+    name: "reset_whole_site_content",
+    displayName: "Vaciar el sitio completo",
+    category: "marketing_write",
+    description:
+      "IRREVERSIBLE Y TOTAL. Borra el contenido de TODAS las variantes de idioma del sitio. No hay deshacer. " +
+      "Es la operacion mas destructiva del builder: solo ejecutarla si el usuario lo pidio explicitamente y entendio el alcance.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del sitio a vaciar por completo." },
+    }, ["siteId"]),
+    execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/site-data/reset-all/{siteId}", timeout: 30000 },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "siteId" },
+  },
+  {
+    toolId: "tool-529",
+    name: "get_site_template_manifest",
+    displayName: "Ver el manifiesto de una plantilla de sitio",
+    category: "marketing_read",
+    description:
+      "Manifiesto de una plantilla de sitio: que paginas trae, que campos se autocompletan y con que datos del hotel. Sirve para explicarle al usuario que va a pasar si la aplica.",
+    inputSchema: obj({
+      templateId: { type: "string", description: "ID de la plantilla (de list_site_templates)." },
+    }, ["templateId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/site-templates/{templateId}/manifest" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+
+  // ============ MIGRACIONES: MONEDA BASE Y MODELO DE UNIDADES (booking) =====
+  // Flujo de dos pasos en los dos casos: se abre un borrador, se revisa el
+  // preview, se ajusta y recien ahi se confirma. El commit es el punto sin
+  // retorno.
+  {
+    toolId: "tool-530",
+    name: "get_open_currency_migration",
+    displayName: "Ver la migracion de moneda en curso",
+    category: "settings_read",
+    description: "Borrador de migracion de moneda base abierto para la propiedad, si hay uno. Devuelve el preview con reservas, tarifas y servicios afectados.",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/migrations/open" },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-531",
+    name: "open_currency_migration",
+    displayName: "Abrir una migracion de moneda base",
+    category: "settings_write",
+    description:
+      "Abre el borrador para cambiar la MONEDA BASE de la propiedad. No cambia nada todavia: calcula el preview de como quedarian tarifas, servicios y reservas. " +
+      "Es un cambio estructural del hotel — confirmalo con el usuario antes de abrirlo y avisale que despues hay que revisar el preview y confirmar el commit.",
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      toCurrency: { type: "string", description: "Codigo ISO de la moneda destino (ej. USD, ARS, EUR)." },
+    }, ["toCurrency"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/migrations", timeout: 30000 },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-532",
+    name: "get_currency_migration",
+    displayName: "Ver un borrador de migracion de moneda",
+    category: "settings_read",
+    description: "Detalle completo de un borrador de migracion de moneda por su ID.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador de migracion." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/migrations/{draftId}" },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-533",
+    name: "set_migration_reservation_override",
+    displayName: "Fijar el monto de una reserva en la migracion",
+    category: "settings_write",
+    description:
+      "Fija a mano el monto convertido de una reserva dentro del borrador de migracion (sobrescribe el calculado por la tasa). " +
+      "Pasar manualToAmount en null limpia el override y vuelve al valor calculado.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+      reservationId: { type: "string", description: "ID de la reserva." },
+      manualToAmount: { type: "number", description: "Monto manual en la moneda destino. null vuelve al calculado." },
+    }, ["draftId", "reservationId"]),
+    execution: { targetService: "booking-app", method: "PATCH", pathTemplate: "/api/v1/migrations/{draftId}/reservation-override" },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-534",
+    name: "set_migration_rate",
+    displayName: "Fijar la tasa de cambio de la migracion",
+    category: "settings_write",
+    description: "Fija a mano la tasa de cambio del borrador y recalcula TODO el preview con ese valor.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+      rate: { type: "number", description: "Tasa de cambio (mayor a 0)." },
+    }, ["draftId", "rate"]),
+    execution: { targetService: "booking-app", method: "PATCH", pathTemplate: "/api/v1/migrations/{draftId}/rate", timeout: 30000 },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-535",
+    name: "cancel_currency_migration",
+    displayName: "Cancelar la migracion de moneda",
+    category: "settings_write",
+    description: "Descarta el borrador de migracion de moneda. No afecta nada del hotel: el borrador todavia no se habia aplicado.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/migrations/{draftId}/cancel" },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-536",
+    name: "commit_currency_migration",
+    displayName: "Confirmar la migracion de moneda base",
+    category: "settings_write",
+    description:
+      "IRREVERSIBLE. Aplica la migracion: reescribe la moneda base de la propiedad y convierte tarifas, servicios y reservas segun el preview. " +
+      "Antes de ejecutarlo, leé el borrador con get_currency_migration y contale al usuario cuantas reservas, tarifas y servicios se van a tocar.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador a confirmar." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/migrations/{draftId}/commit", timeout: 60000 },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "draftId" },
+  },
+  {
+    toolId: "tool-537",
+    name: "retry_currency_migration",
+    displayName: "Reintentar lo que fallo de la migracion de moneda",
+    category: "settings_write",
+    description: "Reintenta SOLO las entidades que fallaron en un commit previo de migracion de moneda.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/migrations/{draftId}/retry", timeout: 60000 },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-538",
+    name: "get_open_unit_migration",
+    displayName: "Ver la migracion de unidades en curso",
+    category: "rooms_read",
+    description:
+      "Borrador abierto de migracion del modelo de unidades (pasar de una categoria con N unidades a N categorias de una unidad). Trae el preview.",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/unit-migrations/open" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-539",
+    name: "open_unit_migration",
+    displayName: "Abrir una migracion del modelo de unidades",
+    category: "rooms_write",
+    description:
+      "Abre el borrador para migrar el modelo de habitaciones (categoria con varias unidades -> una categoria por unidad). " +
+      "No cambia nada todavia: arma el preview de categorias, tarifas y reservas afectadas.",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/unit-migrations", timeout: 30000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-540",
+    name: "get_unit_migration",
+    displayName: "Ver un borrador de migracion de unidades",
+    category: "rooms_read",
+    description: "Detalle de un borrador de migracion del modelo de unidades por su ID.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/unit-migrations/{draftId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-541",
+    name: "update_unit_migration_preview",
+    displayName: "Ajustar una categoria del preview de migracion",
+    category: "rooms_write",
+    description:
+      "Edita como va a quedar una de las categorias nuevas del preview: nombre, descripcion, precio base, capacidad, amenities, fotos, tamaño. Solo toca el borrador.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+      unitId: { type: "string", description: "ID de la unidad cuyo preview se ajusta." },
+      name: { type: "string", description: "Nombre de la categoria resultante." },
+      description: { type: "string", description: "Descripcion." },
+      basePrice: { type: "object", description: "{ amount: number, currency: string }." },
+      capacity: { type: "object", description: "{ adults: number, children: number }." },
+      amenities: { type: "array", description: "IDs de amenities.", items: { type: "string" } },
+      photos: { type: "array", description: "URLs de fotos.", items: { type: "string" } },
+      size: { type: "number", description: "Superficie en m2." },
+    }, ["draftId", "unitId"]),
+    execution: { targetService: "booking-app", method: "PATCH", pathTemplate: "/api/v1/unit-migrations/{draftId}/preview/{unitId}" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-542",
+    name: "resolve_unit_migration_reservation",
+    displayName: "Asignar una reserva en la migracion de unidades",
+    category: "rooms_write",
+    description: "Decide a que unidad destino va una reserva existente dentro del borrador de migracion.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+      reservationId: { type: "string", description: "ID de la reserva." },
+      targetUnitId: { type: "string", description: "ID de la unidad destino." },
+    }, ["draftId", "reservationId", "targetUnitId"]),
+    execution: { targetService: "booking-app", method: "PATCH", pathTemplate: "/api/v1/unit-migrations/{draftId}/resolve-reservation" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-543",
+    name: "set_unit_migration_rate_plan_strategy",
+    displayName: "Definir que pasa con una tarifa en la migracion",
+    category: "rooms_write",
+    description:
+      "Define que hacer con un plan tarifario al migrar: 'clone_to_all' lo copia a todas las categorias nuevas, 'move_to' lo mueve a una sola (hay que pasar moveToUnitId).",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+      ratePlanId: { type: "string", description: "ID del plan tarifario." },
+      strategy: { type: "string", description: "clone_to_all o move_to." },
+      moveToUnitId: { type: "string", description: "Requerido si strategy es move_to." },
+    }, ["draftId", "ratePlanId", "strategy"]),
+    execution: { targetService: "booking-app", method: "PATCH", pathTemplate: "/api/v1/unit-migrations/{draftId}/rate-plan-strategy" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-544",
+    name: "commit_unit_migration",
+    displayName: "Confirmar la migracion del modelo de unidades",
+    category: "rooms_write",
+    description:
+      "IRREVERSIBLE. Aplica la migracion: reescribe categorias, unidades, tarifas y la asignacion de las reservas segun el borrador. " +
+      "Leé el borrador y contale al usuario el impacto exacto antes de ejecutarlo.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador a confirmar." },
+      reason: { type: "string", description: "Motivo del cambio (queda en la auditoria)." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/unit-migrations/{draftId}/commit", timeout: 60000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "draftId" },
+  },
+  {
+    toolId: "tool-545",
+    name: "retry_unit_migration",
+    displayName: "Reintentar lo que fallo de la migracion de unidades",
+    category: "rooms_write",
+    description: "Reintenta solo las entidades que fallaron en un commit previo de migracion de unidades.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/unit-migrations/{draftId}/retry", timeout: 60000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-546",
+    name: "cancel_unit_migration",
+    displayName: "Cancelar la migracion de unidades",
+    category: "rooms_write",
+    description: "Descarta el borrador de migracion de unidades. No afecta al hotel.",
+    inputSchema: obj({
+      draftId: { type: "string", description: "ID del borrador." },
+    }, ["draftId"]),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/unit-migrations/{draftId}/cancel" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+
+  // ============ MOTOR DE RESERVAS: catalogo y auditoria del modelo ==========
+  {
+    toolId: "tool-547",
+    name: "list_engine_categories",
+    displayName: "Categorias del motor de reservas",
+    category: "reservations_read",
+    description:
+      "Catalogo de categorias tal como lo ve el MOTOR de reservas (carga manual, panel y tarifas lo usan para resolver la categoria). " +
+      "Para el inventario de habitaciones usa list_room_categories.",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/categories" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-548",
+    name: "get_engine_model_audit",
+    displayName: "Auditoria del modelo del motor",
+    category: "settings_read",
+    description:
+      "Revisa la coherencia del modelo de la propiedad desde el motor de reservas (categorias sin unidades, unidades huerfanas, tarifas sin categoria) y devuelve los problemas encontrados.",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/categories/properties/{propertyId}/model-audit", timeout: 20000 },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-549",
+    name: "autocorrect_engine_model",
+    displayName: "Autocorregir el modelo del motor",
+    category: "settings_write",
+    description:
+      "Aplica las correcciones automaticas que propone la auditoria del modelo del motor. Leé primero get_engine_model_audit y explicale al usuario que se va a corregir.",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/categories/properties/{propertyId}/model-audit/auto-correct", timeout: 30000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-550",
+    name: "list_engine_units",
+    displayName: "Unidades segun el motor de reservas",
+    category: "reservations_read",
+    description:
+      "Catalogo de unidades como lo ve el motor de reservas (lo usan el panel del dia y la asignacion de habitacion al check-in).",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/units" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+
+  // ============ EMPRESA, ALTA, ONBOARDING Y PLAN ============================
+  {
+    toolId: "tool-551",
+    name: "list_associated_companies",
+    displayName: "Empresas asociadas",
+    category: "settings_read",
+    description: "Empresas asociadas a la empresa activa (grupos hoteleros, franquicias).",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/company/associated" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-552",
+    name: "set_company_language",
+    displayName: "Cambiar el idioma de la plataforma",
+    category: "settings_write",
+    description: "Cambia el idioma de la plataforma para toda la empresa (es, en, pt, fr, de).",
+    inputSchema: obj({
+      ...COMPANY_PARAM,
+      language: { type: "string", description: "Codigo de idioma: es, en, pt, fr o de." },
+    }, ["language"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/company/{companyId}/language" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-553",
+    name: "add_users_to_company",
+    displayName: "Agregar usuarios existentes a la empresa",
+    category: "settings_write",
+    description:
+      "Agrega a la empresa personas que YA tienen cuenta en la plataforma, por email. Para alguien que todavia no tiene cuenta usa invite_company_user (manda el mail de alta). " +
+      "OJO: quien entra por aca arranca SIN accesos acotados (ve todas las propiedades) hasta que se le editen los accesos con update_company_user_access — avisale al usuario.",
+    inputSchema: obj({
+      ...COMPANY_PARAM,
+      users: {
+        type: "array",
+        description: "Personas a agregar.",
+        items: {
+          type: "object",
+          properties: {
+            email: { type: "string", description: "Email de la cuenta existente." },
+            role: { type: "string", description: "Rol en la empresa: owner, admin, staff, editor o viewer." },
+          },
+          required: ["email"],
+        },
+      },
+    }, ["users"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/company/{companyId}/users" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-554",
+    name: "get_company_onboarding",
+    displayName: "Estado del alta de la empresa",
+    category: "settings_read",
+    description: "Estado del asistente de alta: paso actual, pasos completados, plantilla aplicada, si el alta esta terminada.",
+    inputSchema: obj({ ...COMPANY_PARAM }),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/company/{companyId}/onboarding" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-555",
+    name: "update_company_onboarding",
+    displayName: "Actualizar el alta de la empresa",
+    category: "settings_write",
+    description:
+      "Marca avance en el asistente de alta (paso actual, pasos completados, plantilla aplicada, alta terminada). Usar solo cuando el usuario pida retomar o saltear un paso del alta.",
+    inputSchema: obj({
+      ...COMPANY_PARAM,
+      currentStep: { type: "string", description: "Paso actual del asistente." },
+      completedSteps: { type: "array", description: "Pasos completados.", items: { type: "string" } },
+      templateApplied: { type: "boolean", description: "Si ya se aplico una plantilla de propiedad." },
+      templateSlug: { type: "string", description: "Slug de la plantilla aplicada." },
+      completed: { type: "boolean", description: "Alta terminada." },
+      propertyId: { type: "string", description: "Propiedad creada en el alta." },
+      setupCompleted: { type: "boolean", description: "Configuracion inicial terminada." },
+      dataLoading: { type: "boolean", description: "Carga de datos en curso." },
+      dataLoadingCompleted: { type: "boolean", description: "Carga de datos terminada." },
+      guidedToursIntroSeen: { type: "boolean", description: "Vio la intro de los tours guiados." },
+    }),
+    execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/company/{companyId}/onboarding" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-556",
+    name: "mark_reservation_setup_reviewed",
+    displayName: "Marcar revisada la configuracion de reservas",
+    category: "settings_write",
+    description:
+      "Marca como revisada la configuracion inicial del motor de reservas. Es lo que hace desaparecer el cartel de 'revisa la configuracion' que tapa la pantalla del PMS.",
+    inputSchema: obj({ ...COMPANY_PARAM }),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/company/{companyId}/onboarding/reservation-setup-reviewed" },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-557",
+    name: "list_plans",
+    displayName: "Planes disponibles",
+    category: "settings_read",
+    description: "Catalogo de planes comerciales de Roombir con lo que incluye cada uno (apps, limites, cupo de Roombir IA).",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/plans" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-558",
+    name: "get_my_plan",
+    displayName: "Plan actual de la empresa",
+    category: "settings_read",
+    description: "Plan contratado por la empresa: que incluye, limites y cupo de Roombir IA disponible.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/plans/me" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-559",
+    name: "select_plan",
+    displayName: "Elegir un plan",
+    category: "settings_write",
+    description:
+      "Cambia el plan comercial de la empresa. Afecta la facturacion y puede activar o desactivar funciones. Mostrale al usuario que cambia (list_plans) antes de confirmarlo.",
+    inputSchema: obj({
+      planId: { type: "string", description: "ID del plan (de list_plans)." },
+    }, ["planId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/plans/select" },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-560",
+    name: "list_company_projects",
+    displayName: "Proyectos de la empresa",
+    category: "marketing_read",
+    description: "Proyectos (agrupadores de sitios web) de la empresa.",
+    inputSchema: obj({ ...COMPANY_PARAM }),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/project/company/{companyId}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-561",
+    name: "get_catalog_item",
+    displayName: "Ver un item del catalogo propio",
+    category: "settings_read",
+    description: "Detalle de un item del catalogo propio de la empresa por su ID.",
+    inputSchema: obj({
+      itemId: { type: "string", description: "ID del item." },
+    }, ["itemId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/custom-catalog/items/{itemId}" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+
+  // ============ CHAT INTERNO DEL EQUIPO (pms-core) ==========================
+  // El chat entre companeros de trabajo del PMS, no el chat con el agente.
+  {
+    toolId: "tool-562",
+    name: "list_team_conversations",
+    displayName: "Conversaciones del equipo",
+    category: "settings_read",
+    description: "Conversaciones del chat interno del equipo en las que participa el usuario (directas, de grupo y de espacio).",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/chat/conversations" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-563",
+    name: "create_team_conversation",
+    displayName: "Crear una conversacion del equipo",
+    category: "settings_write",
+    description:
+      "Abre una conversacion del chat interno: 'direct' (uno a uno), 'group' (varios) o 'space' (de un espacio operativo, requiere nombre). Los memberIds son userIds — sacalos de list_company_users.",
+    inputSchema: obj({
+      type: { type: "string", description: "direct, group o space." },
+      memberIds: { type: "array", description: "IDs de los usuarios participantes.", items: { type: "string" } },
+      name: { type: "string", description: "Nombre de la conversacion (obligatorio para type 'space')." },
+      admins: { type: "array", description: "IDs de los usuarios administradores de la conversacion.", items: { type: "string" } },
+    }, ["type", "memberIds"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/chat/conversations" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-564",
+    name: "list_team_messages",
+    displayName: "Mensajes de una conversacion del equipo",
+    category: "settings_read",
+    description: "Mensajes de una conversacion del chat interno del equipo.",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+      limit: { type: "number", description: "Cantidad de mensajes a traer." },
+      before: { type: "string", description: "Traer mensajes anteriores a esta fecha/ID (paginado)." },
+    }, ["conversationId"]),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/chat/conversations/{conversationId}/messages" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-565",
+    name: "send_team_message",
+    displayName: "Mandar un mensaje al equipo",
+    category: "settings_write",
+    description:
+      "Manda un mensaje en una conversacion del chat interno. Lo envia EN NOMBRE DEL USUARIO: mostrale el texto exacto y confirmalo antes.",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+      content: { type: "string", description: "Texto del mensaje." },
+      type: { type: "string", description: "user (default) o system." },
+    }, ["conversationId", "content"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/chat/conversations/{conversationId}/messages" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-566",
+    name: "add_team_conversation_members",
+    displayName: "Agregar gente a una conversacion",
+    category: "settings_write",
+    description: "Suma participantes a una conversacion del chat interno.",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+      memberIds: { type: "array", description: "IDs de los usuarios a agregar.", items: { type: "string" } },
+      role: { type: "string", description: "admin o member." },
+    }, ["conversationId", "memberIds"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/chat/conversations/{conversationId}/members" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-567",
+    name: "remove_team_conversation_member",
+    displayName: "Sacar a alguien de una conversacion",
+    category: "settings_write",
+    description: "Quita a un participante de una conversacion del chat interno.",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+      memberId: { type: "string", description: "ID del participante a quitar." },
+    }, ["conversationId", "memberId"]),
+    execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/chat/conversations/{conversationId}/members/{memberId}" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+  {
+    toolId: "tool-568",
+    name: "archive_team_conversation",
+    displayName: "Archivar una conversacion",
+    category: "settings_write",
+    description: "Archiva una conversacion del chat interno (se puede desarchivar desde la app).",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+    }, ["conversationId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/chat/conversations/{conversationId}/archive" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-569",
+    name: "mute_team_conversation",
+    displayName: "Silenciar una conversacion",
+    category: "settings_write",
+    description: "Silencia o desilencia las notificaciones de una conversacion del chat interno.",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+      muted: { type: "boolean", description: "true silencia, false vuelve a notificar." },
+    }, ["conversationId", "muted"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/chat/conversations/{conversationId}/mute" },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-570",
+    name: "mark_team_conversation_read",
+    displayName: "Marcar una conversacion como leida",
+    category: "settings_write",
+    description: "Marca como leidos los mensajes de una conversacion del chat interno.",
+    inputSchema: obj({
+      conversationId: { type: "string", description: "ID de la conversacion." },
+    }, ["conversationId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/chat/conversations/{conversationId}/read" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+
+  // ============ CUENTA, SESION, GUIAS E INDUCCION ===========================
+  {
+    toolId: "tool-571",
+    name: "update_my_profile",
+    displayName: "Editar mi perfil",
+    category: "settings_write",
+    description:
+      "Cambia los datos del perfil del propio usuario: nombre, telefono y avatar. Son los unicos campos editables. " +
+      "La contraseña NO se cambia desde el chat: se hace desde Perfil en el PMS.",
+    inputSchema: obj({
+      name: { type: "string", description: "Nombre para mostrar." },
+      phone: { type: "string", description: "Telefono en formato internacional (E.164, ej. +5491122334455)." },
+      avatar: { type: "string", description: "URL de la foto de perfil." },
+    }),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/user/profile" },
+    permissions: { requiredRoles: [], requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-572",
+    name: "set_active_company",
+    displayName: "Cambiar de empresa activa",
+    category: "settings_write",
+    description:
+      "Cambia la empresa activa del usuario. Cambia TODO el contexto del PMS y del chat (propiedades, permisos, datos). Confirmalo siempre.",
+    inputSchema: obj({
+      companyId: { type: "string", description: "ID de la empresa (de list_my_companies)." },
+    }, ["companyId"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/user/active-company" },
+    permissions: { requiredRoles: [], requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-573",
+    name: "set_active_operative_space",
+    displayName: "Cambiar de espacio operativo",
+    category: "settings_write",
+    description:
+      "Cambia el espacio operativo activo del usuario (Recepcion, Limpieza, Marketing, Revenue...). Cambia el menu del PMS y las apps a las que se puede acceder.",
+    inputSchema: obj({
+      operativeSpaceId: { type: "string", description: "ID del espacio operativo (de list_operative_spaces)." },
+    }, ["operativeSpaceId"]),
+    execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/user/active-operative-space" },
+    permissions: { requiredRoles: [], requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-574",
+    name: "get_guide_progress",
+    displayName: "Avance en las guias de uso",
+    category: "settings_read",
+    description: "Estado de las guias/tours de uso del usuario: cuales vio, cuales dejo a medias y cuales no arranco.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/user/guide-progress" },
+    permissions: { requiredRoles: [], requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-575",
+    name: "update_guide_progress",
+    displayName: "Actualizar el avance de una guia",
+    category: "settings_write",
+    description: "Marca el estado de una guia de uso (ofrecida, empezada, completada) o su paso actual.",
+    inputSchema: obj({
+      guideId: { type: "string", description: "ID de la guia." },
+      status: { type: "string", description: "offered, started, completed o dismissed." },
+      stepIndex: { type: "number", description: "Paso actual." },
+      totalSteps: { type: "number", description: "Cantidad total de pasos." },
+      offered: { type: "boolean", description: "Si ya se le ofrecio al usuario." },
+    }, ["guideId"]),
+    execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/user/guide-progress/{guideId}" },
+    permissions: { requiredRoles: [], requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-576",
+    name: "list_my_devices",
+    displayName: "Mis dispositivos y accesos",
+    category: "settings_read",
+    description:
+      "Dispositivos y sesiones desde los que el usuario entro a la plataforma, con fecha, lugar aproximado y equipo. Sirve para responder '¿alguien mas entro a mi cuenta?'.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/access/me/devices" },
+    permissions: { requiredRoles: [], requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-577",
+    name: "close_my_session",
+    displayName: "Cerrar la sesion",
+    category: "settings_write",
+    description:
+      "Cierra la sesion del usuario y la registra en la bitacora de accesos. El usuario va a tener que volver a entrar. Confirmalo antes.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/access/logout" },
+    permissions: { requiredRoles: [], requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-578",
+    name: "get_induction_tree",
+    displayName: "Mapa de la plataforma para el usuario",
+    category: "settings_read",
+    description:
+      "Arbol de la induccion: espacios operativos del usuario, areas de cada uno y apps de cada area, con el avance. Es el mapa de que puede usar esta persona y que todavia no conoce.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/induction/tree" },
+    permissions: { requiredRoles: [], requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-579",
+    name: "list_induction_progress",
+    displayName: "Avance de la induccion por espacio",
+    category: "settings_read",
+    description: "Resumen del avance de la induccion en cada espacio operativo del usuario.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/induction/spaces" },
+    permissions: { requiredRoles: [], requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-580",
+    name: "reset_induction",
+    displayName: "Reiniciar la induccion",
+    category: "settings_write",
+    description: "Borra el avance de la induccion del usuario para que vuelva a verla desde cero.",
+    inputSchema: obj({}),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/induction/reset" },
+    permissions: { requiredRoles: [], requiresConfirmation: true, isDestructive: false },
+  },
+
+  // ============ SERVICIOS Y LIBRERIA: extras ================================
+  {
+    toolId: "tool-581",
+    name: "list_service_room_categories",
+    displayName: "Categorias de habitacion para vincular servicios",
+    category: "settings_read",
+    description: "Categorias de habitacion disponibles para vincular a un servicio extra (las resuelve el motor de reservas).",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/properties/{propertyId}/services/room-categories" },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-582",
+    name: "migrate_service_prices",
+    displayName: "Convertir los precios de los servicios",
+    category: "settings_write",
+    description:
+      "Convierte en bloque los precios de TODOS los servicios extra de la propiedad a otra moneda. Parte del migrador de moneda: normalmente se usa junto con la migracion de moneda base.",
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      toCurrency: { type: "string", description: "Moneda destino (ISO, ej. USD)." },
+      rate: { type: "number", description: "Tasa de cambio a aplicar." },
+    }, ["toCurrency"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/services/migrate-prices", timeout: 30000 },
+    permissions: { requiredRoles: OWNER_ROLES, requiresConfirmation: true, isDestructive: true, irreversible: true, confirmSubject: "toCurrency" },
+  },
+  {
+    toolId: "tool-583",
+    name: "upload_image_to_library",
+    displayName: "Subir una imagen a la libreria",
+    category: "marketing_write",
+    description:
+      "Sube una imagen a la libreria de archivos desde su contenido en base64. Para una imagen que el usuario adjunto al chat, usa add_image_to_library (toma los bytes del adjunto).",
+    inputSchema: obj({
+      dataB64: { type: "string", description: "Contenido de la imagen en base64 (sin el prefijo data:)." },
+      mediaType: { type: "string", description: "Tipo MIME, ej. image/jpeg o image/png." },
+      name: { type: "string", description: "Nombre del archivo." },
+      folderId: { type: "string", description: "Carpeta destino de la libreria." },
+    }, ["dataB64", "mediaType"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/asset-library/files/upload-base64", timeout: 30000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-584",
+    name: "replace_library_image",
+    displayName: "Reemplazar una imagen de la libreria",
+    category: "marketing_write",
+    description:
+      "Reemplaza el archivo de una imagen de la libreria manteniendo su ID. La imagen nueva aparece en TODOS los lugares donde se usaba la anterior (sitios, galerias, categorias).",
+    inputSchema: obj({
+      fileId: { type: "string", description: "ID del archivo a reemplazar." },
+      url: { type: "string", description: "URL de la imagen nueva." },
+      width: { type: "number", description: "Ancho en pixeles." },
+      height: { type: "number", description: "Alto en pixeles." },
+    }, ["fileId", "width", "height"]),
+    execution: { targetService: "pms-core", method: "PUT", pathTemplate: "/asset-library/files/{fileId}/replace", timeout: 30000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: true },
+  },
+
+  // ============ PRESENCIA ONLINE: generadores de texto ======================
+  {
+    toolId: "tool-585",
+    name: "regenerate_social_asset_copy",
+    displayName: "Regenerar el texto de una publicacion",
+    category: "marketing_write",
+    description: "Vuelve a generar el texto de una publicacion de redes ya creada, manteniendo la pieza. Devuelve el texto nuevo para revisar antes de publicar.",
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      assetId: { type: "string", description: "ID de la publicacion." },
+    }, ["assetId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/assets/{assetId}/regenerate-copy", timeout: 45000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-586",
+    name: "generate_gbp_description",
+    displayName: "Generar la descripcion de Google Business",
+    category: "marketing_write",
+    description:
+      "Genera la descripcion del hotel para la ficha de Google Business a partir de los datos de la propiedad. La deja lista para revisar; publicarla es otro paso (publish_gbp_post).",
+    inputSchema: obj({ ...PROPERTY_PARAM }),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/gbp/generate-description", timeout: 45000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-587",
+    name: "generate_ota_description",
+    displayName: "Generar la descripcion para una OTA",
+    category: "marketing_write",
+    description: "Genera la descripcion del hotel adaptada a una OTA (booking, expedia, airbnb...). Queda para revisar antes de copiarla al portal.",
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      platform: { type: "string", description: "Plataforma: booking, expedia, airbnb, despegar..." },
+    }, ["platform"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/otas/{platform}/generate-description", timeout: 45000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+  {
+    toolId: "tool-588",
+    name: "generate_ota_room_descriptions",
+    displayName: "Generar las descripciones de habitaciones para una OTA",
+    category: "marketing_write",
+    description: "Genera las descripciones de TODAS las categorias de habitacion adaptadas a una OTA. Quedan para revisar.",
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      platform: { type: "string", description: "Plataforma: booking, expedia, airbnb, despegar..." },
+    }, ["platform"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/properties/{propertyId}/social-hub/otas/{platform}/generate-room-descriptions", timeout: 60000 },
+    permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
   },
 
   // ===================== LECTURA CRUDA DE LA API (GET a cualquier endpoint) ==

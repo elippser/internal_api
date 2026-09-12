@@ -143,7 +143,21 @@ const PMS_CORE_RULES: RouteRule[] = [
   { method: "PATCH", path: "/user/active-operative-space", access: "member", label: "Espacio operativo activo" },
   { method: "GET", path: "/user/by-email", capability: ["users.manage"], label: "Buscar usuario por email" },
   { method: "*", path: "/user/guide-progress", access: "member", label: "Progreso de guías" },
+  { method: "*", path: "/user/guide-progress/*", access: "member", label: "Progreso de guías" },
   { method: "*", path: "/api/v1/induction/*", access: "member", label: "Inducción" },
+  // Bitácora de accesos del propio usuario (USERS-ACTIONS-SPEC). Las reglas de
+  // bloqueo (`/api/v1/access/blocks/*`) las administra internal-roombir con el
+  // secret interno: no llegan por acá y no llevan regla a propósito.
+  { method: "GET", path: "/api/v1/access/me/devices", access: "member", label: "Mis dispositivos" },
+  { method: "POST", path: "/api/v1/access/logout", access: "member", label: "Cerrar sesión" },
+  { method: "*", path: "/api/v1/access/session-started", access: "member", label: "Bitácora de accesos" },
+  { method: "*", path: "/api/v1/access/events/:eventId/geo", access: "member", label: "Bitácora de accesos" },
+  // Planes comerciales: el catálogo y el plan vigente los lee cualquiera del
+  // staff (el aviso de "tu plan no incluye X" tiene que poder leerlo quien no
+  // es admin); elegirlo es decisión comercial del tenant.
+  { method: "GET", path: "/api/v1/plans", access: "member", label: "Planes" },
+  { method: "GET", path: "/api/v1/plans/me", access: "member", label: "Plan de la empresa" },
+  { method: "POST", path: "/api/v1/plans/select", roles: ADMIN_ROLES, capability: ["billing.manage"], label: "Elegir plan" },
   { method: "GET", path: "/api/v1/notifications", access: "member", label: "Notificaciones" },
   { method: "POST", path: "/api/v1/notifications/mark-read", access: "member", label: "Notificaciones" },
   { method: "GET", path: "/api/v1/search", access: "member", label: "Buscador global" },
@@ -156,6 +170,9 @@ const PMS_CORE_RULES: RouteRule[] = [
   { method: "GET", path: "/company/associated", access: "member", label: "Empresas asociadas" },
   { method: "GET", path: "/company/:companyId/onboarding", access: "member", label: "Onboarding" },
   { method: "PATCH", path: "/company/:companyId/onboarding", capability: ["company.settings"], label: "Onboarding" },
+  { method: "POST", path: "/company/:companyId/onboarding/*", capability: ["company.settings"], label: "Onboarding" },
+  { method: "PUT", path: "/company/:companyId/language", roles: ADMIN_ROLES, capability: ["company.settings"], label: "Idioma de la plataforma" },
+  { method: "PUT", path: "/company/language", roles: ADMIN_ROLES, capability: ["company.settings"], label: "Idioma de la plataforma" },
   { method: "GET", path: "/company/:companyId/users", capability: ["users.manage"], label: "Equipo" },
   { method: "POST", path: "/company/:companyId/users", capability: ["users.manage"], label: "Equipo (agregar usuarios)" },
   { method: "POST", path: "/company/:companyId/invite", capability: ["users.manage"], label: "Equipo (invitar)" },

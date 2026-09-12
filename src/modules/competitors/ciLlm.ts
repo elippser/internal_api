@@ -1,5 +1,10 @@
 import { capabilitiesFor } from "../../engine/llm/catalog";
-import { getAnthropic } from "../conversations/services/anthropicClient";
+import {
+  getLlmClient,
+  modelFor,
+  thinkingBlockFor,
+  withReasoningHeadroom,
+} from "../../shared/llm/provider";
 import { computeCostUsd } from "../usage/usage.pricing";
 import type { LlmUsageRecord } from "./competitors.model";
 
@@ -10,13 +15,16 @@ import type { LlmUsageRecord } from "./competitors.model";
  * se guarda en los documentos del modulo (ci_radar_runs, aiDraft.usage).
  */
 
-export const radarModel = () => process.env.CI_RADAR_MODEL ?? "claude-sonnet-4-6";
-export const draftModel = () => process.env.CI_DRAFT_MODEL ?? "claude-haiku-4-5-20251001";
-export const evidenceModel = () => process.env.CI_EVIDENCE_MODEL ?? "claude-sonnet-4-6";
+// El radar y la evidencia usan la server tool de busqueda web y tienen que
+// juzgar lo que traen: van al tier estandar. El borrador solo reescribe lo ya
+// juzgado, asi que le alcanza el barato.
+export const radarModel = () => process.env.CI_RADAR_MODEL ?? modelFor("standard");
+export const draftModel = () => process.env.CI_DRAFT_MODEL ?? modelFor("cheap");
+export const evidenceModel = () => process.env.CI_EVIDENCE_MODEL ?? modelFor("standard");
 const webSearchUsdPer1000 = () => Number(process.env.CI_WEB_SEARCH_USD_PER_1000 ?? 10);
 
 export function aiAvailable(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_API_KEY);
 }
 
 /**
@@ -114,12 +122,18 @@ interface MessageLike {
 }
 
 export async function callJson(opts: CallJsonOptions): Promise<CallJsonResult> {
-  const client = getAnthropic();
+  const client = getLlmClient();
   const model = opts.model;
+  // Estas llamadas quieren JSON, no razonamiento visible, y los modelos del
+  // catalogo nuevo piensan por defecto gastando el MISMO presupuesto de salida:
+  // un JSON que antes entraba en 1500 tokens vuelve cortado y cae en el
+  // reparador de JSON truncado. Se apaga donde el modelo lo permite.
+  const thinking = thinkingBlockFor(model, { enabled: false });
   const body: Record<string, unknown> = {
     model,
-    max_tokens: opts.maxTokens ?? 1_500,
+    max_tokens: withReasoningHeadroom(model, opts.maxTokens ?? 1_500),
     system: opts.system,
+    ...(thinking ? { thinking } : {}),
   };
   if (opts.webSearch) {
     // El SDK 0.27 no tipa las server tools: se manda la bolsa tal cual, igual

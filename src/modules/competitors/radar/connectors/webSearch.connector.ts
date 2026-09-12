@@ -11,7 +11,7 @@ import type {
 /**
  * Connector `web_search` (spec §7.3): una llamada a Claude con la server tool
  * web_search por query fija, que devuelve candidatos ya clasificados. Necesita
- * un modelo con server tools (Sonnet); Haiku no las soporta de forma confiable.
+ * un modelo con server tools (tier estandar).
  */
 
 const RADAR_SYSTEM =

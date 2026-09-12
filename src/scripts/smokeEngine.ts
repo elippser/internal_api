@@ -10,13 +10,17 @@
  *   1. Fundamentos  — salud, vocabulario, catálogo, contrato de eventos
  *   2. Autoría      — agente, versionado inmutable, activación, validaciones
  *   3. Ciclo de vida— encolado, control (pausar/cancelar), linaje
- *   4. Ejecución    — corrida real contra el modelo (requiere ANTHROPIC_API_KEY)
+ *   4. Ejecución    — corrida real contra el modelo (requiere OPENROUTER_API_KEY)
  *
  * Uso:
  *   API_URL=http://localhost:8600 SMOKE_EMAIL=... SMOKE_PASSWORD=... npm run smoke:engine
  *   (o SMOKE_TOKEN=<jwt> para saltear el login)
  */
 import "dotenv/config";
+
+// El humo corre contra el tier barato: es el mas rapido y el mas economico, y
+// lo que se prueba aca es el motor, no la capacidad del modelo.
+const SMOKE_MODEL = `openrouter/${process.env.LLM_MODEL_CHEAP ?? "deepseek/deepseek-v4-flash-0731"}`;
 
 const BASE = (process.env.API_URL ?? "http://localhost:8600").replace(/\/$/, "");
 const API = `${BASE}/api/v1`;
@@ -155,7 +159,7 @@ async function phase2Authoring(): Promise<void> {
 
   // --- Validaciones que DEBEN correr al guardar ---
   const badInterrupt = await call("POST", `/engine/agents/${created.agentId}/versions`, {
-    modelName: "claude-haiku-4-5",
+    modelName: SMOKE_MODEL,
     config: { interruptions: [{ trigger: "tool_call" }] },
   });
   if (badInterrupt.status !== 422) {
@@ -168,14 +172,14 @@ async function phase2Authoring(): Promise<void> {
   ok("una interrupción por herramienta sin nombre se rechaza al guardar");
 
   const badCost = await call("POST", `/engine/agents/${created.agentId}/versions`, {
-    modelName: "claude-haiku-4-5",
+    modelName: SMOKE_MODEL,
     config: { interruptions: [{ trigger: "cost_threshold" }] },
   });
   if (badCost.status !== 422) die("umbral de costo", "debería rechazarse explícitamente");
   ok("el umbral de costo se rechaza explícitamente");
 
   const badGraph = await call("POST", `/engine/agents/${created.agentId}/versions`, {
-    modelName: "claude-haiku-4-5",
+    modelName: SMOKE_MODEL,
     graphType: "flow_dag",
   });
   if (badGraph.status !== 422) die("tipo de grafo", "la autoría de flow_dag está desactivada");
@@ -184,7 +188,7 @@ async function phase2Authoring(): Promise<void> {
   // --- Versión válida ---
   const v1 = expect(
     await call("POST", `/engine/agents/${created.agentId}/versions`, {
-      modelName: "claude-haiku-4-5",
+      modelName: SMOKE_MODEL,
       systemPrompt: "Respondé en una sola oración, en español.",
       tools: ["think"],
       modelParams: { maxTokens: 512 },
@@ -198,7 +202,7 @@ async function phase2Authoring(): Promise<void> {
 
   const v2 = expect(
     await call("POST", `/engine/agents/${created.agentId}/versions`, {
-      modelName: "claude-haiku-4-5",
+      modelName: SMOKE_MODEL,
       systemPrompt: "Respondé en DOS oraciones.",
       modelParams: { maxTokens: 512 },
       changeNote: "segunda versión",
@@ -338,8 +342,8 @@ async function phase3Lifecycle(): Promise<void> {
 async function phase4RealRun(): Promise<void> {
   console.log("\n[4/4] Corrida real contra el proveedor");
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log("  · omitida: falta ANTHROPIC_API_KEY");
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.log("  · omitida: falta OPENROUTER_API_KEY");
     return;
   }
 

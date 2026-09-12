@@ -8,25 +8,25 @@
  */
 import type { Request, Response } from "express";
 import { fail, ok, paginated, parsePagination } from "../../shared/utils/http";
-import { listAnthropicModels } from "../../shared/utils/anthropicModels";
+import { listSelectableModels } from "../../shared/llm/selectableModels";
 import { agentsService } from "./agents.service";
 import { listAgentsSchema } from "./agents.validation";
 
 export const agentsController = {
   /**
-   * Modelos que provee la API de Anthropic. Se mantiene por compatibilidad; el
+   * Modelos que provee el catalogo de OpenRouter. Se mantiene por compatibilidad; el
    * sucesor con capacidades reales por modelo es `/engine/system/models`.
    */
   async availableModels(_req: Request, res: Response) {
     try {
-      const data = await listAnthropicModels();
+      const data = await listSelectableModels();
       return ok(res, { data });
     } catch (err) {
       console.error("[agents] no se pudieron listar modelos:", err);
       return fail(
         res,
         502,
-        "No se pudieron obtener los modelos de Anthropic",
+        "No se pudieron obtener los modelos de OpenRouter",
         "models_unavailable",
       );
     }

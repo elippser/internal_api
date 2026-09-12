@@ -26,7 +26,7 @@ import { webSearchConnector } from "./connectors/webSearch.connector";
  * Orquestador del radar (spec §7.4-7.5): corre los connectors, dedupea por
  * dominio contra Tier 1 y contra la propia cola, persiste items y corridas.
  * El change watch compara snapshots de texto (home + pricing) y solo llama a
- * Haiku cuando el hash cambio.
+ * El tier barato cuando el hash cambio.
  */
 
 const CONNECTORS: Record<string, RadarConnector> = {
@@ -107,7 +107,7 @@ async function guardRunningRun() {
  */
 export async function runRadar(input: RunRadarInput) {
   if (!aiAvailable()) {
-    throw new CiError(503, "IA no disponible: falta ANTHROPIC_API_KEY", "ai_unavailable");
+    throw new CiError(503, "IA no disponible: falta OPENROUTER_API_KEY", "ai_unavailable");
   }
   await guardRunningRun();
   const settings = await getSettings();
@@ -418,7 +418,7 @@ export async function runChangeWatch(runId: string | null, competitorIds?: strin
 /** Check puntual desde el detalle: corre el watch solo para ese competidor y deja su corrida. */
 export async function checkCompetitorChanges(competitorId: string, userId: string | null) {
   if (!aiAvailable()) {
-    throw new CiError(503, "IA no disponible: falta ANTHROPIC_API_KEY", "ai_unavailable");
+    throw new CiError(503, "IA no disponible: falta OPENROUTER_API_KEY", "ai_unavailable");
   }
   const comp = await Competitor.findOne({ competitorId }).lean();
   if (!comp) throw new CiError(404, "Competidor no encontrado", "not_found");

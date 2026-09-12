@@ -16,7 +16,14 @@ import { retrieve } from "./services/ragRetriever";
 import { buildSystemPromptParts } from "./services/promptAssembler";
 import { renderSkillsBlock, resolveSkills } from "../../engine/skills/resolver";
 import { runTurn, type StepEvent } from "./services/conversationRunner";
+import { typedAnswerMatches } from "./services/confirmationPolicy";
 import { routeTurn } from "./services/taskRouter";
+import { prepareStrategicTurn } from "../growth/strategicTurn";
+import {
+  getActivePlan,
+  markStep,
+  renderActivePlanBlock,
+} from "../growth/plan/plan.service";
 import {
   executeTool,
   ToolExecutionError,
@@ -331,6 +338,15 @@ export const conversationsService = {
     const lastAssistant = [...history]
       .reverse()
       .find((m) => m.role === "assistant");
+    // El plan activo del espacio cumple dos funciones distintas en el turno:
+    // (1) el router lo necesita para entender "hacé el paso 2", y (2) su bloque
+    // va al prompt de TODOS los turnos, no sólo los estratégicos — porque el
+    // usuario va a escribir "¿cómo venimos?" en medio de una charla operativa.
+    const activePlan = await getActivePlan({
+      operativeSpaceId: session.context.operativeSpaceId ?? undefined,
+      propertyId: session.context.propertyId ?? undefined,
+    });
+
     const route = await routeTurn({
       userMessage: content,
       recentContext:
@@ -339,7 +355,45 @@ export const conversationsService = {
           : undefined,
       // Sólo las tools que el usuario puede usar entran al turno.
       enabledToolIds: access.allowedToolIds,
+      hasActivePlan: !!activePlan,
     });
+
+    // ── Turno estratégico ────────────────────────────────────────────────────
+    //
+    // Objetivo de negocio abierto: en vez de soltar al modelo con 357 tools
+    // para que descubra el estado del hotel de a una llamada por vez, se le
+    // entrega la foto ya resuelta, las estrategias que aplican y el índice de
+    // palancas que puede proponer. Si la preparación falla (no se pudo leer la
+    // propiedad), se sigue con el turno normal: peor respuesta, pero respuesta.
+    let strategic: Awaited<ReturnType<typeof prepareStrategicTurn>> = null;
+    if (route.strategicRequest && session.context.propertyId) {
+      try {
+        strategic = await prepareStrategicTurn({
+          propertyId: session.context.propertyId,
+          companyId: session.context.companyId ?? undefined,
+          operativeSpaceId: session.context.operativeSpaceId ?? undefined,
+          userId: session.context.userId ?? undefined,
+          agentId: agent.agentId,
+          sessionId: session.sessionId,
+          scope,
+          allowedToolIds: access.allowedToolIds,
+          routedModel: route.subAgent.model,
+        });
+        if (strategic) {
+          console.log(
+            `[conversations] turno estratégico: foto en ${strategic.meta.snapshotMs}ms, ` +
+            `${strategic.meta.playbookIds.length} playbooks (${strategic.meta.playbookIds.join(", ") || "ninguno"}), ` +
+            `${strategic.meta.leverCount} palancas` +
+            (strategic.meta.missing.length ? `, sin datos: ${strategic.meta.missing.join(", ")}` : ""),
+          );
+        }
+      } catch (err) {
+        console.warn(
+          "[conversations] no se pudo preparar el turno estratégico; sigo con el normal:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
 
     // Contenido real para el modelo: adjuntos + texto. Imagen/PDF van inline
     // en base64; CSV/texto se decodifica y va como document de texto plano.
@@ -366,24 +420,44 @@ export const conversationsService = {
     if (content.trim()) userBlocks.push({ type: "text", text: content });
     const userContent: unknown = userBlocks.length ? userBlocks : content;
 
+    // El bloque del plan activo va en TODOS los turnos (el estratégico ya lo
+    // incluye en el suyo, con los deltas de KPI calculados contra la foto
+    // fresca). Sin esto, "hacé el paso 2" en una charla operativa no tiene a
+    // qué referirse.
+    const planBlock =
+      activePlan && !strategic ? renderActivePlanBlock(activePlan) : "";
+
+    const effectiveDynamic = [systemDynamic, planBlock, strategic?.dynamicBlock]
+      .filter((s) => s && s.trim())
+      .join("\n\n---\n\n");
+    const effectiveStatic = [systemStatic, strategic?.staticBlock]
+      .filter((s) => s && s.trim())
+      .join("\n\n---\n\n");
+
     // Pipeline
     const result = await runTurn({
       session: session as any,
       agent: agent as any,
-      systemStatic,
-      systemDynamic,
+      systemStatic: effectiveStatic,
+      systemDynamic: effectiveDynamic,
       history,
       userMessage: content,
       userContent,
       ragChunksUsed: ragChunksMeta,
-      model: route.subAgent.model,
-      toolIds: route.toolIds,
-      specialization: route.subAgent.specialization,
+      model: strategic?.model ?? route.subAgent.model,
+      toolIds: strategic?.toolIds ?? route.toolIds,
+      specialization: strategic?.specialization ?? route.subAgent.specialization,
       webSearch: route.subAgent.webSearch,
       codeExec: route.subAgent.codeExec,
-      hasSkills: skills.length > 0,
+      // En el turno estratégico las habilidades no se ofrecen: el procedimiento
+      // que necesita ya vino en los playbooks, y `load_skill` sólo gastaría una
+      // de las tres iteraciones.
+      hasSkills: !strategic && skills.length > 0,
       attachments,
       scope,
+      profile: strategic?.profile,
+      planContext: strategic?.planContext,
+      strategicMeta: strategic?.meta,
       onStep: stream?.onStep,
       onDelta: stream?.onDelta,
       onTextEnd: stream?.onTextEnd,
@@ -412,9 +486,18 @@ export const conversationsService = {
         subAgent: route.subAgent.id,
         subAgentLabel: route.subAgent.label,
         routedTier: route.subAgent.tier,
+        strategic: result.strategic,
       },
       createdAt: new Date(),
     });
+
+    // Si el turno ejecutó una tool que era un paso del plan activo, el paso
+    // queda marcado. Se hace acá y no en el runner porque recién ahora existe
+    // el messageId, que es lo que permite volver al punto del hilo donde se
+    // hizo. Es best-effort: un plan desactualizado no puede romper el turno.
+    if (activePlan && result.toolsExecuted.length > 0) {
+      void markExecutedPlanSteps(activePlan, result.toolsExecuted, assistantMsg.messageId);
+    }
 
     // Si hubo capture_feedback_request exitoso -> completar agentResponse
     const feedbackCalls = result.toolsExecuted.filter(
@@ -488,9 +571,22 @@ export const conversationsService = {
   // Descarga un archivo generado por la IA (code_execution) desde la Files API
   // de Anthropic. El SDK 0.27.x no expone la Files API, así que pegamos al REST
   // con el beta header. Devuelve el binario + nombre/mime para el navegador.
+  //
+  // Desde la migración a OpenRouter esta ruta sólo sirve ids VIEJOS: la server
+  // tool code_execution no sobrevive el pasaje por el gateway (400 "Invalid
+  // Anthropic Messages API request"), así que no se generan archivos nuevos.
+  // Sigue en pie para que un file_id ya guardado en una conversación se pueda
+  // descargar mientras quede la clave de Anthropic; sin ella, el error dice por
+  // qué en vez de un 500 mudo.
   async fetchGeneratedFile(fileId: string) {
     const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) throw httpError(500, "ANTHROPIC_API_KEY no configurada");
+    if (!key) {
+      throw httpError(
+        410,
+        "Los archivos generados vivían en la Files API de Anthropic y ya no hay clave " +
+          "configurada. La generación de archivos está deshabilitada desde la migración a OpenRouter.",
+      );
+    }
     const headers = {
       "x-api-key": key,
       "anthropic-version": "2023-06-01",
@@ -552,12 +648,51 @@ export const conversationsService = {
     sessionId: string,
     toolName: string,
     args: Record<string, unknown>,
+    confirm: { confirmationId?: string; confirmText?: string } = {},
   ) {
-    if (!ACTIONABLE_TOOLS.has(toolName)) {
-      throw httpError(403, "Accion no permitida", "action_not_allowed");
-    }
     const session = await ConversationSession.findOne({ sessionId });
     if (!session) throw httpError(404, "Sesion no encontrada");
+
+    // Dos caminos llegan acá:
+    //   (1) las cards accionables de siempre (ACTIONABLE_TOOLS), que el usuario
+    //       dispara desde el chat sin pasar por el modelo;
+    //   (2) la TARJETA DE CONFIRMACIÓN que emitió el runner al frenar un borrado
+    //       o una acción irreversible. Ese camino no usa lista blanca: usa la
+    //       confirmación pendiente que el propio runtime guardó, y exige que
+    //       coincida el id, la tool y los argumentos exactos. Así el botón no
+    //       se puede usar para ejecutar otra cosa que la que se mostró.
+    if (confirm.confirmationId) {
+      const pending = session.pendingConfirmation as any;
+      if (!pending?.confirmationId) {
+        throw httpError(409, "No hay ninguna acción esperando confirmación.", "no_pending_confirmation");
+      }
+      if (pending.confirmationId !== confirm.confirmationId) {
+        throw httpError(409, "Esta confirmación ya no es la vigente.", "stale_confirmation");
+      }
+      if (pending.toolName !== toolName) {
+        throw httpError(409, "La acción confirmada no coincide con la pendiente.", "confirmation_mismatch");
+      }
+      if (pending.expiresAt && new Date(pending.expiresAt).getTime() < Date.now()) {
+        session.pendingConfirmation = null;
+        await session.save();
+        throw httpError(410, "La confirmación venció. Pedile la acción de nuevo al asistente.", "confirmation_expired");
+      }
+      if (JSON.stringify(pending.inputArgs ?? {}) !== JSON.stringify(args ?? {})) {
+        throw httpError(409, "Los datos de la acción cambiaron desde que se pidió la confirmación.", "confirmation_args_mismatch");
+      }
+      if (pending.level === "typed" && !typedAnswerMatches(pending.subjectValue, confirm.confirmText)) {
+        throw httpError(
+          400,
+          `Para confirmar esta acción hay que escribir exactamente "${pending.subjectValue}".`,
+          "confirmation_text_mismatch",
+        );
+      }
+      // Consumida: una confirmación sirve para UNA ejecución.
+      session.pendingConfirmation = null;
+      await session.save();
+    } else if (!ACTIONABLE_TOOLS.has(toolName)) {
+      throw httpError(403, "Accion no permitida", "action_not_allowed");
+    }
 
     const agent = await resolveAgent(session.agentId);
     const tool = await Tool.findOne({ name: toolName, status: "active" });
@@ -604,7 +739,7 @@ export const conversationsService = {
       throw err;
     }
 
-    const summary = actionSummary(toolName, args, result);
+    const summary = actionSummary(toolName, args, result, tool.displayName ?? undefined);
     const msg = await ConversationMessage.create({
       messageId: `msg-${uuidv4()}`,
       sessionId: session.sessionId,
@@ -744,6 +879,47 @@ export const conversationsService = {
   },
 };
 
+/**
+ * Marca como ejecutados los pasos del plan cuya tool corrió en este turno.
+ *
+ * Se mira lo que REALMENTE se ejecutó (`toolsExecuted`), no lo que el modelo
+ * dijo que iba a hacer: el plan es un registro de hechos, y un paso que se
+ * marca solo porque el agente lo anunció convierte el seguimiento en ficción.
+ *
+ * Un paso puede fallar. Ahí queda `fallido` con el código del error, para que
+ * el turno siguiente pueda decir "el paso 3 falló por permisos" en vez de
+ * volver a proponerlo como si nada.
+ */
+async function markExecutedPlanSteps(
+  plan: { planId: string; steps: Array<{ stepId: string; tool: string; status: string }> },
+  executed: Array<{ toolName: string; outcome: string; errorMessage?: string }>,
+  messageId: string,
+): Promise<void> {
+  try {
+    const pending = plan.steps.filter(
+      (s) => s.status === "sugerido" || s.status === "aceptado",
+    );
+    for (const step of pending) {
+      const hit = executed.find((e) => e.toolName === step.tool);
+      if (!hit) continue;
+      await markStep({
+        planId: plan.planId,
+        stepId: step.stepId,
+        status: hit.outcome === "success" ? "ejecutado" : "fallido",
+        messageId,
+        resultSummary:
+          hit.outcome === "success" ? `Ejecutado desde el chat.` : undefined,
+        errorCode: hit.outcome === "success" ? undefined : hit.errorMessage,
+      });
+    }
+  } catch (err) {
+    console.warn(
+      "[conversations] no se pudo marcar el paso del plan:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 async function buildHistoryWindow(sessionId: string) {
   const lastN = await ConversationMessage.find({ sessionId })
     .sort({ createdAt: -1 })
@@ -790,6 +966,7 @@ function actionSummary(
   toolName: string,
   args: Record<string, unknown>,
   result: unknown,
+  displayName?: string,
 ): string {
   const r = (result ?? {}) as Record<string, any>;
   switch (toolName) {
