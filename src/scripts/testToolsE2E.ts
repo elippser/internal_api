@@ -59,11 +59,14 @@ const ONLY = onlyAt >= 0 ? new Set(String(argv[onlyAt + 1] ?? "").split(",").fil
 
 // ── Catálogo del código, con los defaults que aplica seed:agent-tools ─────────
 
-const CATALOG: any[] = (INITIAL_TOOLS as any[]).map((t) => ({
+const ALL_TOOLS: any[] = (INITIAL_TOOLS as any[]).map((t) => ({
   ...t,
   status: t.status ?? "active",
   execution: { authStrategy: "staff_jwt", timeout: 10000, ...t.execution },
 }));
+// Las inactivas no se publican al agente: no se prueban, se listan aparte.
+const CATALOG: any[] = ALL_TOOLS.filter((t) => t.status === "active");
+const INACTIVE: string[] = ALL_TOOLS.filter((t) => t.status !== "active").map((t) => t.name);
 const byName = new Map(CATALOG.map((t) => [t.name, t]));
 
 /** Tools nativas que solo leen aunque su pathTemplate declare un POST. */
@@ -810,6 +813,7 @@ async function main(): Promise<void> {
   await connectDB();
   console.log(`\n=== E2E DEL CATÁLOGO DE ROOMBIR IA (${CATALOG.length} tools del código) ===`);
   console.log(`usuario ${CTX.userId} · empresa ${CTX.companyId} · propiedad ${CTX.propertyId}`);
+  for (const name of INACTIVE) record("catálogo", name, "skip", "inactiva en el catálogo (no se publica al agente)");
 
   await liveReads();
   await dryRunWrites();

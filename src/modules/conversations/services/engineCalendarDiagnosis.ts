@@ -509,9 +509,9 @@ export async function runEngineDiagnosisTool(
   if (limits.minLimit) findings.push(`La salida mínima es el ${bounds.minCo} por ${limits.minLimit}.`);
   if (bounds.maxCo < to) {
     findings.push(
-      `Después del ${bounds.maxCo} ningún día sirve como salida de esa llegada. Con el calendario actual del motor, tocar uno de esos días arranca una estadía nueva; ` +
-        `en las versiones anteriores al 13-09-2026 esos días quedaban DESHABILITADOS mostrando precio y cupo, y el huésped tenía que volver a tocar "Llegada" para elegirlos. ` +
-        `Si el hotel quiere permitir estadías más largas, el ajuste es la estadía máxima.`,
+      `Después del ${bounds.maxCo} ningún día sirve como SALIDA de esa llegada, pero NO están bloqueados: en la web, tocar uno de esos días lo toma como ` +
+        `llegada nueva (así el huésped elige directamente una fecha más lejana). Lo único que no se puede es una estadía de más de ${limits.maxNights} noches; ` +
+        `si el hotel quiere permitirla, el ajuste es la estadía máxima.`,
     );
   }
 

@@ -4999,6 +4999,10 @@ export const INITIAL_TOOLS = [
   {
     toolId: "tool-590",
     name: "check_site_quality",
+    // Inactiva hasta que /site-data/quality llegue a producción: el panel de
+    // Calidad (app + API) todavía es trabajo sin publicar y en prod da 404.
+    // Activar junto con ese deploy (seed:agent-tools).
+    status: "inactive",
     displayName: "Revisar la calidad de un sitio web",
     category: "marketing_read",
     description:
@@ -5016,6 +5020,7 @@ export const INITIAL_TOOLS = [
   {
     toolId: "tool-591",
     name: "autofix_site_quality",
+    status: "inactive", // ver check_site_quality
     displayName: "Arreglar todo (calidad del sitio)",
     category: "marketing_write",
     description:
