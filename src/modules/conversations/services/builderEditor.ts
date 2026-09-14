@@ -37,6 +37,9 @@ export const BUILDER_EDITOR_TOOLS = new Set([
   "duplicate_page_component",
   "get_site_global_content",
   "edit_site_global_content",
+  "check_site_quality",
+  "autofix_site_quality",
+  "discard_site_draft",
 ]);
 
 /** Tope de hojas devueltas por lectura: más que esto no le sirve al modelo. */
@@ -62,7 +65,7 @@ interface Ctx {
 }
 
 function req<T>(
-  method: "GET" | "PUT" | "POST",
+  method: "GET" | "PUT" | "POST" | "DELETE",
   path: string,
   ctx: Ctx,
   body?: unknown,
@@ -380,6 +383,86 @@ export function parseEdits(raw: unknown): Array<{ path: string; value: string | 
   });
 }
 
+// ── Calidad del sitio (panel "Calidad" del builder) ──────────────────────────
+//
+// Envuelven los dos POST del panel. El chequeo no escribe nada. "Arreglar todo"
+// tampoco escribe del lado del API: devuelve los scopes corregidos y el editor
+// los guarda. Acá se guarda igual que el editor (SiteQualityChip): de cada
+// sección SOLO se reemplazan los `props` que corrigió el lint del servidor, y
+// solo si la cantidad de secciones coincide. Nunca se agregan, quitan ni
+// reordenan secciones, y las secciones van al BORRADOR. Título/descripción de
+// la página y descripción del sitio se guardan directo, como en el editor.
+
+const MAX_QUALITY_ISSUES = 60;
+
+function compactQuality(report: any) {
+  const issues: any[] = Array.isArray(report?.issues) ? report.issues : [];
+  const byCategory: Record<string, number> = {};
+  for (const i of issues) {
+    const c = String(i?.category ?? "otros");
+    byCategory[c] = (byCategory[c] ?? 0) + 1;
+  }
+  return {
+    summary: report?.summary ?? {
+      errors: issues.filter((i) => i?.severity === "error").length,
+      warnings: issues.filter((i) => i?.severity === "warning").length,
+    },
+    byCategory,
+    issues: issues.slice(0, MAX_QUALITY_ISSUES).map((i) => ({
+      rule: i?.rule,
+      severity: i?.severity,
+      category: i?.category,
+      scope: i?.scope,
+      pageId: i?.pageId,
+      sectionIndex: i?.sectionIndex,
+      message: i?.message,
+      autoFixable: Boolean(i?.fix),
+    })),
+    truncated: issues.length > MAX_QUALITY_ISSUES,
+  };
+}
+
+/** Espejo de `mergeFixedProps` de SiteQualityChip. Exportada para test:guardrails. */
+export function mergeFixedProps(current: unknown, fixed: unknown): any[] | null {
+  if (!Array.isArray(current) || !Array.isArray(fixed) || current.length !== fixed.length) return null;
+  let changed = false;
+  const merged = current.map((section: any, index: number) => {
+    const props = (fixed[index] as any)?.props;
+    if (!props || typeof props !== "object") return section;
+    if (JSON.stringify(props) === JSON.stringify(section?.props ?? {})) return section;
+    changed = true;
+    return { ...section, props };
+  });
+  return changed ? merged : null;
+}
+
+async function qualityInput(args: BuilderArgs, ctx: Ctx, requirePage: boolean) {
+  const siteId = str(args.siteId, "siteId");
+  const subSiteId = str(args.subSiteId, "subSiteId");
+  const pageArg = requirePage
+    ? str(args.pageId, "pageId")
+    : typeof args.pageId === "string" ? args.pageId.trim() : "";
+  if (!pageArg) {
+    return { siteId, subSiteId, pageId: null, page: null as any, scopes: null, body: {} };
+  }
+  const subSite = await fetchSubSite(siteId, subSiteId, ctx);
+  const page = findPage(subSite, pageArg);
+  const pageId = String(page._id);
+  const drafts = await fetchDrafts(siteId, subSiteId, pageId, ctx);
+  const globals = subSite?.siteGlobalPagesComponents ?? {};
+  const pick = (draft: any, published: any): any[] =>
+    Array.isArray(draft) ? draft : Array.isArray(published) ? published : [];
+  const scopes: Record<DraftScope, any[]> = {
+    page: pick(drafts.page, page.components),
+    top: pick(drafts.top, globals.topGlobalComponents),
+    bottom: pick(drafts.bottom, globals.bottomGlobalComponents),
+  };
+  return { siteId, subSiteId, pageId, page, scopes, body: { pageId, scopes } };
+}
+
+const qualityPath = (siteId: string, subSiteId: string) =>
+  `/site-data/quality/${encodeURIComponent(subSiteId)}/from/${encodeURIComponent(siteId)}`;
+
 /** Ejecuta una tool nativa del builder. Devuelve el resultado para el modelo. */
 export async function runBuilderTool(
   toolName: string,
@@ -570,6 +653,143 @@ export async function runBuilderTool(
         message:
           `Se guardaron ${applied.length} cambio(s) en el borrador del ${st.scope === "top" ? "encabezado" : "pie"}. ` +
           `Afecta a TODAS las páginas del sitio cuando se publique.`,
+      };
+    }
+
+    // ── Descartar borradores ─────────────────────────────────────────────────
+    // pms-core borra UN scope por request (page con pageId, top o bottom) y
+    // responde 400 sin scope. Expuesto como passthrough, discard_site_draft no
+    // funcionó nunca: la red de seguridad que prometen todas las ediciones
+    // ("se revierte con discard_site_draft") no revertía nada (test:tools-e2e,
+    // 13-09-2026). Acá se descarta cada scope que tenga borrador.
+    case "discard_site_draft": {
+      const siteId = str(args.siteId, "siteId");
+      const subSiteId = str(args.subSiteId, "subSiteId");
+      const scopeArg = typeof args.scope === "string" && args.scope.trim() ? args.scope.trim().toLowerCase() : "all";
+      if (!["all", "page", "top", "bottom"].includes(scopeArg)) {
+        throw new BuilderEditError(`"scope" tiene que ser all, page, top o bottom. Recibido: ${String(args.scope)}.`);
+      }
+      const pageArg = typeof args.pageId === "string" ? args.pageId.trim() : "";
+      if (scopeArg === "page" && !pageArg) {
+        throw new BuilderEditError(`Para descartar solo una página falta "pageId".`);
+      }
+      const subSite = await fetchSubSite(siteId, subSiteId, ctx);
+      const allPages: any[] = Array.isArray(subSite?.pages) ? subSite.pages : [];
+      const pages = pageArg ? [findPage(subSite, pageArg)] : allPages;
+      const draftPath = `/site-data/draft/${encodeURIComponent(subSiteId)}/from/${encodeURIComponent(siteId)}`;
+      const discarded: string[] = [];
+
+      if (scopeArg === "all" || scopeArg === "page") {
+        for (const p of pages) {
+          const pageId = String(p._id);
+          const d = await fetchDrafts(siteId, subSiteId, pageId, ctx);
+          if (!Array.isArray(d.page)) continue;
+          await req("DELETE", draftPath, ctx, { scope: "page", pageId });
+          discarded.push(`página "${p?.name ?? pageId}"`);
+        }
+      }
+      const anyPage = pages[0] ?? allPages[0];
+      if (anyPage && scopeArg !== "page") {
+        const d = await fetchDrafts(siteId, subSiteId, String(anyPage._id), ctx);
+        for (const scope of ["top", "bottom"] as const) {
+          if (scopeArg !== "all" && scopeArg !== scope) continue;
+          if (!Array.isArray(d[scope])) continue;
+          await req("DELETE", draftPath, ctx, { scope });
+          discarded.push(scope === "top" ? "encabezado" : "pie");
+        }
+      }
+      return {
+        ok: true,
+        discarded,
+        published: false,
+        message: discarded.length
+          ? `Se descartó el borrador de: ${discarded.join(", ")}. El sitio publicado no cambió.`
+          : "No había cambios sin publicar: no se descartó nada.",
+      };
+    }
+
+    // ── Calidad del sitio ────────────────────────────────────────────────────
+    case "check_site_quality": {
+      const q = await qualityInput(args, ctx, false);
+      const report = await req<any>("POST", qualityPath(q.siteId, q.subSiteId), ctx, q.body);
+      return {
+        siteId: q.siteId,
+        subSiteId: q.subSiteId,
+        pageId: q.pageId,
+        pageName: q.page?.name ?? null,
+        checked: q.pageId
+          ? "el borrador de la página (o lo publicado si no hay borrador), más encabezado y pie"
+          : "el sitio guardado, todas las páginas",
+        ...compactQuality(report),
+        hint:
+          "autofix_site_quality corrige los problemas con autoFixable: true (pide pageId). El resto va a mano: " +
+          "edit_page_content para textos, imágenes y enlaces; update_site_page para título y descripción de una página; update_site_seo_geo para el sitio.",
+      };
+    }
+
+    case "autofix_site_quality": {
+      const q = await qualityInput(args, ctx, true);
+      const pageId = q.pageId as string;
+      const scopes = q.scopes as Record<DraftScope, any[]>;
+      const result = await req<any>("POST", `${qualityPath(q.siteId, q.subSiteId)}/autofix`, ctx, q.body);
+
+      const savedToDraft: DraftScope[] = [];
+      for (const scope of ["page", "top", "bottom"] as DraftScope[]) {
+        const merged = mergeFixedProps(scopes[scope], result?.scopes?.[scope]);
+        if (!merged) continue;
+        await saveDraft(q.siteId, q.subSiteId, scope, scope === "page" ? pageId : null, merged, ctx);
+        savedToDraft.push(scope);
+      }
+
+      // Solo lo que cambia: el autofix devuelve la meta completa de la página.
+      const metaSrc = result?.pageMeta && typeof result.pageMeta === "object" ? result.pageMeta : {};
+      const pageMeta: Record<string, string> = {};
+      for (const key of ["title", "description", "pageSocialPreview"]) {
+        const v = metaSrc[key];
+        if (typeof v === "string" && v !== (q.page?.[key] ?? "")) pageMeta[key] = v;
+      }
+      if (Object.keys(pageMeta).length) {
+        await req(
+          "PUT",
+          `/site-data/page/${encodeURIComponent(pageId)}/data/from/${encodeURIComponent(q.subSiteId)}/from/${encodeURIComponent(q.siteId)}`,
+          ctx,
+          pageMeta,
+        );
+      }
+      const siteDescription =
+        typeof result?.siteDescription === "string" && result.siteDescription.trim()
+          ? result.siteDescription
+          : null;
+      if (siteDescription) {
+        await req(
+          "PUT",
+          `/site-data/subsite/${encodeURIComponent(q.subSiteId)}/from/${encodeURIComponent(q.siteId)}/seo-geo`,
+          ctx,
+          { description: siteDescription },
+        );
+      }
+
+      const fixed = typeof result?.fixed === "number" ? result.fixed : 0;
+      const scopeLabel: Record<DraftScope, string> = { page: "página", top: "encabezado", bottom: "pie" };
+      const parts: string[] = [];
+      if (savedToDraft.length) {
+        parts.push(
+          `Las secciones corregidas (${savedToDraft.map((s) => scopeLabel[s]).join(", ")}) quedaron en el BORRADOR: falta publicar con publish_site_changes.`,
+        );
+      }
+      if (Object.keys(pageMeta).length) parts.push(`Se guardó directo en la página: ${Object.keys(pageMeta).join(", ")}.`);
+      if (siteDescription) parts.push("Se guardó directo la descripción del sitio.");
+      return {
+        ok: true,
+        fixed,
+        savedToDraft,
+        pageMetaUpdated: Object.keys(pageMeta),
+        siteDescriptionUpdated: Boolean(siteDescription),
+        remaining: compactQuality(result?.report),
+        published: false,
+        message: fixed > 0
+          ? `Se corrigieron ${fixed} problema(s). ${parts.join(" ")}`.trim()
+          : "No quedan problemas con arreglo automático.",
       };
     }
 

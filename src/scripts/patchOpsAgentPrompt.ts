@@ -39,6 +39,14 @@ const SYSTEM_PROMPT =
   "score de visibilidad), identidad de marca (get_property_detail.brand y update_property_brand con el objeto brand COMPLETO), y del builder ademas de proyectos/sitios/paginas: " +
   "publish_site_changes, discard_site_draft, duplicate_site, set_site_property, update_site_seo_geo, popups, Engine Studio, boton de WhatsApp, idiomas, create_site_page/remove_site_page, portada, favicon y update_site_settings. " +
   "EQUIPO: update_company_user_access edita capacidades y propiedades habilitadas de un usuario; update_space_user edita su acceso por app dentro de un espacio operativo. " +
+  "DIAGNOSTICO DE LA WEB Y DEL MOTOR (critico): si el usuario dice que en su web un huesped no puede elegir fechas, que un mes aparece bloqueado o que no ve disponibilidad, " +
+  "la PRIMERA llamada es diagnose_booking_calendar (con la llegada que eligio si la dijo, y siteId/subSiteId de list_property_sites): lee lo mismo que la web y aplica las " +
+  "mismas reglas de su calendario, y te dice que dias se pueden elegir y QUE ajuste pone cada tope (estadia minima o maxima del motor o del dia, anticipacion minima, cierres, " +
+  "llegada/salida cerradas, noches sin cupo). Con eso explicale la causa concreta y como cambiarla (ej. estadia maxima = maxNights en update_engine_settings). " +
+  "NUNCA concluyas 'el problema esta en la web' o 'el widget debe tener un horizonte' sin haberlo corrido: eso es adivinar. Para ver cualquier otra cosa que muestra la web " +
+  "publica tenes las rutas publicas listadas en read_booking_api, read_pms_core_api y read_rooms_api. Una lectura que vuelve vacia o con configured:false NO es un error de " +
+  "lectura: no hay nada guardado y rigen los valores por defecto; decilo asi. CALIDAD DEL SITIO: check_site_quality revisa accesibilidad/SEO/performance y " +
+  "autofix_site_quality es el 'Arreglar todo' (las secciones quedan en el borrador). " +
   "REGLA CRITICA anti-deflexion: ANTES de decir que algo 'no esta disponible' o de ofrecer registrar un pedido, REVISA tus tools " +
   "(especificas + las crudas read_*/write_*). Si existe un endpoint, HACELO — no desvies. Ejemplo: configurar el EMAIL del hotel " +
   "SI EXISTE: es el campo hotelNotificationEmail del motor (get_engine_settings / update_engine_settings). No hay SMTP por hotel: " +
@@ -137,6 +145,8 @@ const CONSTRAINTS = [
   "Revenue: aceptar una recomendacion, crear/editar reglas o poner autoApply en true cambia PRECIOS REALES del motor de reservas. Confirma siempre con fecha y delta explicitos antes de ejecutar",
   "NUNCA contestes con web_search algo que el sistema ya sabe. Ante una pregunta por competidores/comp-set/competencia la PRIMERA llamada es list_competitors; discover_competitors solo busca candidatos nuevos y no es el comp-set. Si mostras resultados de la web, van en una seccion aparte y etiquetada como 'no cargados en el sistema' — nunca mezclados con los cargados",
   "Cuando una lectura del RMS vuelva vacia (sin competidores, sin eventos, sin reglas), deci que NO HAY NADA CARGADO y ofrece cargarlo. No lo suplas con datos de la web presentandolos como si fueran del hotel",
+  "Si en la web del hotel no se pueden elegir fechas o no se ve disponibilidad, la primera llamada es diagnose_booking_calendar. No atribuyas la causa a 'la web', 'el widget' o 'una version vieja' sin ese diagnostico, y cerra siempre con la causa concreta y el ajuste que la cambia",
+  "Un resultado vacio, null o configured:false es una lectura que FUNCIONO sin datos guardados. Nunca lo informes como 'no pude leer' ni como 'la consulta fallo'",
 ];
 
 /**
@@ -191,7 +201,7 @@ async function main() {
   const published = await publishOpsAgentVersion({
     systemPrompt: composeEnginePrompt((agent.persona ?? {}) as any),
     model: engineModelFor("standard"),
-    changeNote: "patch:ops-prompt — alcance TOTAL: builder de paginas quirurgico, migraciones, chat de equipo, planes, onboarding, perfil/sesion + gate duro de confirmacion",
+    changeNote: "patch:ops-prompt — diagnostico del motor en la web (diagnose_booking_calendar), lecturas publicas, calidad del sitio y vacio != error",
   });
   logPublishResult(published, "prompt");
 

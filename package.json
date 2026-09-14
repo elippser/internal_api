@@ -65,6 +65,8 @@
     "smoke:leads": "ts-node --transpile-only src/scripts/smokeLeads.ts",
     "mail:preview": "ts-node --transpile-only src/scripts/leadMailPreview.ts",
     "verify:tool-coverage": "ts-node --transpile-only src/scripts/verifyToolCoverage.ts",
+    "verify:engine-calendar-mirror": "ts-node --transpile-only src/scripts/verifyEngineCalendarMirror.ts",
+    "test:tools-e2e": "ts-node --transpile-only src/scripts/testToolsE2E.ts",
     "seed:base-skills": "ts-node src/scripts/seedBaseSkills.ts",
     "test:guardrails": "ts-node --transpile-only src/scripts/testAgentGuardrails.ts",
     "seed:growth-playbooks": "ts-node src/scripts/seedGrowthPlaybooks.ts",

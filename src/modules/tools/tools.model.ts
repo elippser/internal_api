@@ -95,6 +95,11 @@ const executionSchema = new Schema(
       default: "staff_jwt",
     },
     timeout: { type: Number, default: 10000 },
+    // En las lecturas el ejecutor agrega ?propertyId=<propiedad de la sesión>.
+    // false = no agregarlo: endpoints cross-property cuyo Joi strict lo rechaza
+    // (ej. GET /api/v1/guests/search). verify:tool-coverage lo exige cuando el
+    // schema de la query no admite propertyId.
+    injectPropertyId: { type: Boolean, default: true },
   },
   { _id: false },
 );
@@ -311,17 +316,40 @@ export const INITIAL_TOOLS = [
     displayName: "Crear reserva",
     category: "reservations_write",
     description:
-      "Crea una reserva (carga manual / walk-in). Pedir al usuario huesped, fechas, categoria/unidad y monto si faltan.",
+      "Crea una reserva (carga manual / walk-in). Requiere categoria (list_room_categories), fechas y adultos, y el huesped: " +
+      "guestId si ya existe (search_guest_by_email) o guestContact { firstName, lastName, email } si es nuevo. " +
+      "El precio lo calcula el motor (ratePlanId de check_availability para elegir tarifa). Pedile al usuario lo que falte.",
+    // reservationCreateSchema (Joi strict) exige categoryId + checkIn + checkOut +
+    // adults + (guestId | guestContact) y rechaza guestName/guestEmail/
+    // roomCategoryId/unitId/totalAmount: la definicion anterior respondia 400 en
+    // TODA llamada (verify:tool-coverage, 13-09-2026).
     inputSchema: obj({
       ...PROPERTY_PARAM,
-      guestName: { type: "string" },
-      guestEmail: { type: "string" },
-      checkIn: { type: "string", description: "YYYY-MM-DD." },
-      checkOut: { type: "string", description: "YYYY-MM-DD." },
-      roomCategoryId: { type: "string" },
-      unitId: { type: "string" },
-      totalAmount: { type: "number" },
-    }),
+      categoryId: { type: "string", description: "Categoria de habitacion (list_room_categories). Requerido." },
+      checkIn: { type: "string", description: "Llegada YYYY-MM-DD. Requerido." },
+      checkOut: { type: "string", description: "Salida YYYY-MM-DD, posterior a checkIn. Requerido." },
+      adults: { type: "number", description: "Adultos (>= 1). Requerido." },
+      children: { type: "number", description: "Ninos (default 0)." },
+      infants: { type: "number", description: "Bebes (no cuentan para capacidad ni precio)." },
+      guestId: { type: "string", description: "Huesped existente (de search_guest_by_email). Usar esto O guestContact." },
+      guestContact: {
+        type: "object",
+        description: "Huesped nuevo. Usar esto O guestId.",
+        properties: {
+          firstName: { type: "string", description: "Nombre. Requerido." },
+          lastName: { type: "string", description: "Apellido. Requerido." },
+          email: { type: "string", description: "Email. Requerido." },
+          phone: { type: "string", description: "Telefono en formato E.164 (ej. +5491122334455)." },
+          nationality: { type: "string", description: "Codigo de pais ISO de 2 o 3 letras." },
+        },
+      },
+      ratePlanId: { type: "string", description: "Tarifa elegida (de check_availability). Opcional." },
+      promoCode: { type: "string", description: "Codigo de promocion. Opcional." },
+      channel: { type: "string", description: "direct, phone u ota." },
+      sourceChannelId: { type: "string", description: "Canal de origen del catalogo (ej. whatsapp). Opcional." },
+      specialRequests: { type: "string", description: "Pedidos del huesped." },
+      internalNotes: { type: "string", description: "Notas internas del hotel." },
+    }, ["categoryId", "checkIn", "checkOut", "adults"]),
     execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/reservations" },
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
   },
@@ -440,7 +468,9 @@ export const INITIAL_TOOLS = [
     name: "get_rate_plan_detail",
     displayName: "Detalle de tarifa",
     category: "reservations_read",
-    description: "Detalle de un plan de tarifas por ID.",
+    description:
+      "Detalle de un plan de tarifas por ratePlanId (de get_rate_plans). OJO: `__base__` NO es un plan: es la 'Tarifa estandar' que arma el motor " +
+      "con el precio base de la categoria cuando no hay planes cargados; no tiene detalle (el precio base se ve en list_room_categories).",
     inputSchema: obj({ ratePlanId: { type: "string" } }, ["ratePlanId"]),
     execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/rate-plans/{ratePlanId}" },
     permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
@@ -506,8 +536,13 @@ export const INITIAL_TOOLS = [
     name: "toggle_promo",
     displayName: "Activar/desactivar promocion",
     category: "reservations_write",
-    description: "Activa o desactiva una promocion.",
-    inputSchema: obj({ promoId: { type: "string" } }, ["promoId"]),
+    description: "Activa o desactiva una promocion: isEnabled true la activa, false la pausa.",
+    // promoToggleSchema exige isEnabled: sin declararlo, esta tool respondia 400
+    // en TODA llamada (lo encontro test:tools-e2e --writes, 13-09-2026).
+    inputSchema: obj({
+      promoId: { type: "string" },
+      isEnabled: { type: "boolean", description: "true = activa, false = pausada." },
+    }, ["promoId", "isEnabled"]),
     execution: { targetService: "booking-app", method: "PATCH", pathTemplate: "/api/v1/promos/{promoId}/toggle" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
   },
@@ -527,17 +562,39 @@ export const INITIAL_TOOLS = [
     displayName: "Editar configuracion del motor",
     category: "property_write",
     description:
-      "Actualiza la configuracion del motor de reservas. Accion sensible. " +
+      "Actualiza la configuracion del motor de reservas: HORARIOS de check-in y check-out, email de avisos, estadia minima y maxima, " +
+      "anticipacion minima, modo de confirmacion, monedas, vencimiento de reservas pendientes y calendario publico. " +
+      "Manda SOLO los campos que cambian (es un update parcial). " +
       "Aca vive el EMAIL DE AVISOS del hotel (hotelNotificationEmail): la casilla que recibe el aviso de cada reserva nueva " +
       "y a la que le llegan las respuestas del huesped. No hay SMTP por hotel: los mails al huesped salen siempre de " +
-      "reservations@roombir.com. Si piden 'configurar el email del hotel', es esta tool.",
+      "reservations@roombir.com. Si piden 'configurar el email del hotel' o 'cambiar los horarios', es esta tool.",
     inputSchema: obj({
       ...PROPERTY_PARAM,
-      hotelNotificationEmail: { type: "string", description: "Casilla del hotel que recibe los avisos de reserva nueva y las respuestas del huesped." },
+      checkInTime: { type: "string", description: "Hora de check-in, formato HH:mm (ej. 14:00)." },
+      checkOutTime: { type: "string", description: "Hora de check-out, formato HH:mm (ej. 11:00)." },
+      hotelNotificationEmail: { type: "string", description: "Casilla del hotel que recibe los avisos de reserva nueva y las respuestas del huesped. Vacio la quita." },
       guestEmailNotificationsEnabled: { type: "boolean", description: "Si el huesped recibe email al confirmarse la reserva." },
-      confirmationMode: { type: "string", description: "guest_email (confirma el huesped por email) o manual (confirma el hotel)." },
+      confirmationMode: { type: "string", description: "Unicos valores validos: guest_email (confirma el huesped por email) o manual (confirma el hotel)." },
+      minNights: { type: "number", description: "Estadia minima en noches (1 a 365)." },
+      maxNights: { type: "number", description: "Estadia maxima en noches (1 a 365, mayor o igual a minNights)." },
+      minAnticipationHours: { type: "number", description: "Horas minimas de anticipacion para reservar (0 = sin minimo)." },
+      pendingExpirationMinutes: { type: "number", description: "Minutos hasta que vence una reserva pendiente sin confirmar." },
+      pendingAlertHours: { type: "number", description: "Horas tras las que se avisa de una reserva pendiente." },
+      lastMinuteCancellationHours: { type: "number", description: "Horas antes del check-in desde las que una cancelacion cuenta como de ultimo momento." },
+      currency: { type: "string", description: "Moneda base de precios (ISO, ej. ARS). OJO: cambiar la moneda base de verdad es open_currency_migration, no esto." },
+      chargeCurrency: { type: "string", description: "Moneda en la que se cobra (ISO, ej. USD)." },
+      allowGuestCurrencySelection: { type: "boolean", description: "Si el huesped puede elegir la moneda en el motor." },
+      engineCurrencies: { type: "array", description: "Monedas que muestra el motor al huesped (ISO).", items: { type: "string" } },
+      exchangeRateType: { type: "string", description: "Tipo de cambio a usar (ej. blue, oficial)." },
+      calendarInfo: { type: "object", description: "Calendario publico: { enabled, showPrices, showUnits, showRestrictionFlags, showStayHints } (booleanos)." },
+      agenticEnabled: { type: "boolean", description: "Si el motor acepta reservas iniciadas por agentes de IA externos." },
     }),
-    execution: { targetService: "booking-app", method: "PUT", pathTemplate: "/api/v1/engine-settings" },
+    // El controller lee propertyId de la QUERY (no del body) y el schema Joi es
+    // strict: sin `?propertyId=` responde 400 "propertyId es requerido", y si
+    // el ejecutor lo metiera en el body lo rechazaria como clave desconocida.
+    // Con el placeholder en el path, buildPath lo consume y no se inyecta en el
+    // body. Esta tool devolvio 400 en TODA escritura hasta el 12-09-2026.
+    execution: { targetService: "booking-app", method: "PUT", pathTemplate: "/api/v1/engine-settings?propertyId={propertyId}" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
   },
   {
@@ -1107,8 +1164,14 @@ export const INITIAL_TOOLS = [
     name: "create_service_category",
     displayName: "Crear categoria de servicio",
     category: "property_write",
-    description: "Crea una categoria de servicio. Pedir nombre.",
-    inputSchema: obj({ name: { type: "string" } }, ["name"]),
+    description: "Crea una categoria de servicio. El nombre va en 'title' (no 'name').",
+    // pms-core exige `title`: con `name` respondia 400 "title is required" en
+    // TODA llamada (test:tools-e2e --writes, 13-09-2026).
+    inputSchema: obj({
+      title: { type: "string", description: "Nombre de la categoria. Requerido." },
+      icon: { type: "string", description: "Icono (opcional)." },
+      displayOrder: { type: "number", description: "Orden (opcional)." },
+    }, ["title"]),
     execution: { targetService: "pms-core", method: "POST", pathTemplate: "/api/v1/service-categories" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
   },
@@ -1117,8 +1180,14 @@ export const INITIAL_TOOLS = [
     name: "update_service_category",
     displayName: "Editar categoria de servicio",
     category: "property_write",
-    description: "Actualiza una categoria de servicio.",
-    inputSchema: obj({ categoryId: { type: "string" } }, ["categoryId"]),
+    description: "Actualiza una categoria de servicio. El nombre va en 'title'.",
+    inputSchema: obj({
+      categoryId: { type: "string" },
+      title: { type: "string", description: "Nombre nuevo." },
+      icon: { type: "string" },
+      displayOrder: { type: "number" },
+      isActive: { type: "boolean" },
+    }, ["categoryId"]),
     execution: { targetService: "pms-core", method: "PATCH", pathTemplate: "/api/v1/service-categories/{categoryId}" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
   },
@@ -1621,8 +1690,8 @@ export const INITIAL_TOOLS = [
     name: "get_site_template",
     displayName: "Detalle de plantilla de sitio",
     category: "marketing_read",
-    description: "Detalle de una plantilla de sitio por ID.",
-    inputSchema: obj({ templateId: { type: "string" } }, ["templateId"]),
+    description: "Detalle de una plantilla de sitio. templateId es el `_id` que devuelve list_site_templates.",
+    inputSchema: obj({ templateId: { type: "string", description: "El `_id` de la plantilla (de list_site_templates)." } }, ["templateId"]),
     execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/site-templates/{templateId}" },
     permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
   },
@@ -1745,8 +1814,16 @@ export const INITIAL_TOOLS = [
     name: "create_catalog_item",
     displayName: "Crear item de catalogo",
     category: "settings_write",
-    description: "Crea un item en el catalogo custom. Pedir datos.",
-    inputSchema: obj({ name: { type: "string" } }),
+    description:
+      "Guarda un item en el catalogo propio del builder: una SECCION o un ELEMENTO reutilizable. kind 'section' o 'element' y payload con el componente " +
+      "(se obtiene de get_page_content / get_site_draft). Sin kind y payload pms-core responde 400.",
+    // pms-core exige name + kind + payload: con solo `name` respondia 400 en TODA
+    // llamada (test:tools-e2e --writes, 13-09-2026).
+    inputSchema: obj({
+      name: { type: "string", description: "Nombre del item. Requerido." },
+      kind: { type: "string", description: "section o element. Requerido." },
+      payload: { type: "object", description: "El componente a guardar (objeto). Requerido." },
+    }, ["name", "kind", "payload"]),
     execution: { targetService: "pms-core", method: "POST", pathTemplate: "/custom-catalog/items" },
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
   },
@@ -1839,8 +1916,19 @@ export const INITIAL_TOOLS = [
     name: "initialize_availability",
     displayName: "Inicializar disponibilidad",
     category: "reservations_write",
-    description: "Crea los documentos de disponibilidad del motor (carga masiva). Config.",
-    inputSchema: obj({ ...PROPERTY_PARAM, from: { type: "string" }, to: { type: "string" } }),
+    description:
+      "Crea los documentos de disponibilidad del motor para UNA categoria en un rango (carga masiva). Config. " +
+      "categoryId de list_room_categories; totalUnits = unidades vendibles de esa categoria.",
+    // availabilityInitSchema exige categoryId, totalUnits, fromDate y toDate: con
+    // from/to esta tool respondia 400 en TODA llamada (verify:tool-coverage,
+    // 13-09-2026).
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      categoryId: { type: "string", description: "Categoria a inicializar. Requerido." },
+      totalUnits: { type: "number", description: "Unidades vendibles de la categoria (>= 1). Requerido." },
+      fromDate: { type: "string", description: "Desde (YYYY-MM-DD). Requerido." },
+      toDate: { type: "string", description: "Hasta (YYYY-MM-DD, posterior a fromDate). Requerido." },
+    }, ["categoryId", "totalUnits", "fromDate", "toDate"]),
     execution: { targetService: "booking-app", method: "POST", pathTemplate: "/api/v1/availability/initialize" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
   },
@@ -2818,7 +2906,10 @@ export const INITIAL_TOOLS = [
     inputSchema: obj({
       email: { type: "string", description: "Email exacto del huesped." },
     }, ["email"]),
-    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/guests/search" },
+    // Los huéspedes son cross-property (colección compartida con staypass) y el
+    // Joi de /guests/search rechaza propertyId: con la inyección de siempre esta
+    // tool respondía 400 en TODA llamada (lo encontró test:tools-e2e, 13-09-2026).
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/guests/search", injectPropertyId: false },
     permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
   },
   {
@@ -3333,10 +3424,16 @@ export const INITIAL_TOOLS = [
     name: "discard_site_draft",
     displayName: "Descartar borrador de un sitio",
     category: "marketing_write",
-    description: "Descarta el borrador (cambios sin publicar) de un sitio.",
+    description:
+      "Descarta los cambios SIN PUBLICAR de un sitio y vuelve a lo publicado. Por defecto descarta todo (cada pagina con borrador, encabezado y pie); " +
+      "con scope 'page' + pageId solo esa pagina, con 'top' o 'bottom' solo el encabezado o el pie. El sitio en vivo no se toca.",
+    // Tool nativa (builderEditor): pms-core borra un scope por request y exige
+    // `scope`; como passthrough respondia 400 en TODA llamada (13-09-2026).
     inputSchema: obj({
-      siteId: { type: "string" },
-      subSiteId: { type: "string" },
+      siteId: { type: "string", description: "ID del proyecto." },
+      subSiteId: { type: "string", description: "ID del sitio (variante de idioma)." },
+      scope: { type: "string", description: "all (default), page, top o bottom." },
+      pageId: { type: "string", description: "Pagina (ID, nombre o URL). Obligatoria con scope 'page'; sin scope acota el descarte de paginas a esa." },
     }, ["siteId", "subSiteId"]),
     execution: { targetService: "pms-core", method: "DELETE", pathTemplate: "/site-data/draft/{subSiteId}/from/{siteId}" },
     permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: true },
@@ -4064,7 +4161,7 @@ export const INITIAL_TOOLS = [
     description:
       "Manifiesto de una plantilla de sitio: que paginas trae, que campos se autocompletan y con que datos del hotel. Sirve para explicarle al usuario que va a pasar si la aplica.",
     inputSchema: obj({
-      templateId: { type: "string", description: "ID de la plantilla (de list_site_templates)." },
+      templateId: { type: "string", description: "El `_id` de la plantilla (de list_site_templates)." },
     }, ["templateId"]),
     execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/site-templates/{templateId}/manifest" },
     permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
@@ -4425,7 +4522,10 @@ export const INITIAL_TOOLS = [
       templateApplied: { type: "boolean", description: "Si ya se aplico una plantilla de propiedad." },
       templateSlug: { type: "string", description: "Slug de la plantilla aplicada." },
       completed: { type: "boolean", description: "Alta terminada." },
-      propertyId: { type: "string", description: "Propiedad creada en el alta." },
+      // `propertyId` NO se declara a proposito: executeTool inyecta el de la
+      // sesion en el body de toda escritura que lo declare, y el controller lo
+      // guarda tal cual — marcar cualquier paso del alta pisaba en silencio la
+      // propiedad del onboarding con la que el usuario tenia abierta.
       setupCompleted: { type: "boolean", description: "Configuracion inicial terminada." },
       dataLoading: { type: "boolean", description: "Carga de datos en curso." },
       dataLoadingCompleted: { type: "boolean", description: "Carga de datos terminada." },
@@ -4720,8 +4820,14 @@ export const INITIAL_TOOLS = [
     displayName: "Mapa de la plataforma para el usuario",
     category: "settings_read",
     description:
-      "Arbol de la induccion: espacios operativos del usuario, areas de cada uno y apps de cada area, con el avance. Es el mapa de que puede usar esta persona y que todavia no conoce.",
-    inputSchema: obj({}),
+      "Arbol de la induccion de UN espacio operativo: areas del espacio y apps de cada area, con el avance. Es el mapa de que puede usar esta persona y que todavia no conoce. " +
+      "operativeSpaceId sale de list_operative_spaces (o del espacio activo en get_my_space_permissions).",
+    // pms-core lee operativeSpaceId de la QUERY y responde 400 sin el: con el
+    // schema vacio esta tool fallaba en TODA llamada (lo encontro test:tools-e2e,
+    // 13-09-2026).
+    inputSchema: obj({
+      operativeSpaceId: { type: "string", description: "Espacio operativo a mapear (de list_operative_spaces). Requerido." },
+    }, ["operativeSpaceId"]),
     execution: { targetService: "pms-core", method: "GET", pathTemplate: "/api/v1/induction/tree" },
     permissions: { requiredRoles: [], requiresConfirmation: false, isDestructive: false },
   },
@@ -4857,6 +4963,75 @@ export const INITIAL_TOOLS = [
     permissions: { requiredRoles: WRITE_ROLES, requiresConfirmation: true, isDestructive: false },
   },
 
+  // ===================== DIAGNOSTICO DEL MOTOR EN LA WEB (tool nativa) =======
+  // Resuelta en conversations/services/engineCalendarDiagnosis.ts: lee el
+  // calendario publico del motor y aplica las reglas del datepicker de la web.
+  // El pathTemplate es el endpoint que lee (lo usa la politica de acceso).
+  {
+    toolId: "tool-589",
+    name: "diagnose_booking_calendar",
+    displayName: "Diagnosticar el calendario del motor en la web",
+    category: "property_read",
+    description:
+      "Explica QUE fechas puede elegir un huesped en el calendario del motor de reservas de la web y POR QUE no puede elegir otras. " +
+      "Lee lo mismo que la web (el calendario publico del motor) y aplica las mismas reglas del calendario: fecha minima por anticipacion, cupo, cierres, " +
+      "llegada/salida cerradas (CTA/CTD), estadia minima y MAXIMA (del motor y del dia) y noches sin cupo que cortan la estadia. " +
+      "Usala PRIMERO cuando el usuario diga que en su web no puede seleccionar fechas, que un mes aparece bloqueado o que no ve disponibilidad: " +
+      "con `checkIn` (la llegada que eligio el huesped) dice hasta que dia se puede salir y que ajuste pone el tope. " +
+      "Con siteId/subSiteId ademas revisa si el Estudio del Motor de ese sitio apaga el calendario informativo.",
+    inputSchema: obj({
+      ...PROPERTY_PARAM,
+      checkIn: { type: "string", description: "Opcional. Llegada elegida en la web (YYYY-MM-DD). Sin ella se usa la llegada por defecto de la web (hoy)." },
+      from: { type: "string", description: "Opcional. Inicio del tramo a revisar (YYYY-MM-DD). Por defecto hoy." },
+      to: { type: "string", description: "Opcional. Fin del tramo (YYYY-MM-DD), hasta 366 dias despues de from. Por defecto 6 meses." },
+      adults: { type: "number", description: "Adultos de la busqueda (por defecto 2): filtra categorias por capacidad." },
+      children: { type: "number", description: "Ninos de la busqueda (por defecto 0)." },
+      siteId: { type: "string", description: "Opcional. Proyecto web (de list_property_sites) para revisar su Estudio del Motor." },
+      subSiteId: { type: "string", description: "Opcional. Sitio (variante de idioma) de ese proyecto." },
+    }),
+    execution: { targetService: "booking-app", method: "GET", pathTemplate: "/api/v1/availability/public-calendar", timeout: 30000 },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+
+  // ===================== CALIDAD DEL SITIO (panel "Calidad" del builder) ======
+  // Tools nativas de builderEditor.ts: el chequeo no escribe nada; "Arreglar
+  // todo" guarda como el editor (solo props de secciones existentes, al borrador).
+  {
+    toolId: "tool-590",
+    name: "check_site_quality",
+    displayName: "Revisar la calidad de un sitio web",
+    category: "marketing_read",
+    description:
+      "Corre el chequeo de CALIDAD del sitio (el panel 'Calidad' del builder): accesibilidad, performance, SEO, recomendaciones y lectura por agentes de IA. " +
+      "Devuelve el resumen de errores y advertencias, cada problema con su mensaje y cuales tienen arreglo automatico. " +
+      "Sin pageId revisa el sitio guardado entero; con pageId revisa el BORRADOR de esa pagina (o lo publicado si no hay borrador) mas encabezado y pie. No cambia nada.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del proyecto (list_site_projects)." },
+      subSiteId: { type: "string", description: "ID del sitio (variante de idioma)." },
+      pageId: { type: "string", description: "Opcional. ID, nombre o URL de la pagina a revisar con su borrador." },
+    }, ["siteId", "subSiteId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/site-data/quality/{subSiteId}/from/{siteId}", timeout: 30000 },
+    permissions: { requiredRoles: READ_ROLES, requiresConfirmation: false, isDestructive: false },
+  },
+  {
+    toolId: "tool-591",
+    name: "autofix_site_quality",
+    displayName: "Arreglar todo (calidad del sitio)",
+    category: "marketing_write",
+    description:
+      "'Arreglar todo' del panel de Calidad: corrige los problemas con arreglo automatico (textos alternativos, titulos, descripciones, enlaces...) con el mismo lint del chequeo. " +
+      "Las secciones corregidas de la pagina, el encabezado y el pie van al BORRADOR (despues hay que publicar con publish_site_changes); " +
+      "el titulo/descripcion de la pagina y la descripcion del sitio se guardan directo, igual que en el editor. " +
+      "Devuelve cuantos problemas arreglo y lo que queda sin arreglo automatico. Antes corre check_site_quality y contale al usuario que se va a corregir.",
+    inputSchema: obj({
+      siteId: { type: "string", description: "ID del proyecto." },
+      subSiteId: { type: "string", description: "ID del sitio (variante de idioma)." },
+      pageId: { type: "string", description: "ID, nombre o URL de la pagina a corregir (junto con encabezado y pie)." },
+    }, ["siteId", "subSiteId", "pageId"]),
+    execution: { targetService: "pms-core", method: "POST", pathTemplate: "/site-data/quality/{subSiteId}/from/{siteId}/autofix", timeout: 45000 },
+    permissions: { requiredRoles: CONFIG_ROLES, requiresConfirmation: true, isDestructive: false },
+  },
+
   // ===================== LECTURA CRUDA DE LA API (GET a cualquier endpoint) ==
   // Estas 4 tools exponen el 100% de la API de cada microservicio PARA LECTURA.
   // El agente arma la ruta concreta (con los IDs ya sustituidos) y, opcional,
@@ -4877,6 +5052,11 @@ export const INITIAL_TOOLS = [
       "/company/profile · /company/my-companies · /company/associated · /company/<companyId>/users · /user/profile · " +
       "/site-data/company/<companyId>/all · /site-data/<siteId> · /asset-library · /asset-library/folders · /asset-library/files · " +
       "/custom-catalog · /custom-catalog/items · /project/company/<companyId>. " +
+      "LO QUE VE EL PUBLICO en la web del hotel (sin login; sirve para diagnosticar que muestra el sitio): " +
+      "/api/v1/public/properties/list · /api/v1/public/properties/by-slug/<slug> · /api/v1/public/properties/by-id/<propertyId> · " +
+      "/api/v1/public/properties/<propertyId>/brand · /api/v1/public/properties/<propertyId>/reservation-defaults · /api/v1/public/properties/<propertyId>/amenities · " +
+      "/api/v1/public/properties/<propertyId>/galleries · /api/v1/public/properties/<propertyId>/reviews · /api/v1/public/properties/<propertyId>/linkhub · " +
+      "/api/v1/public/properties/<propertyId>/services · /api/v1/public/linkhub/by-slug/<slug>. " +
       "Preferi las tools especificas (list_*/get_*) cuando existan; usa esta para todo lo demas.",
     inputSchema: obj({
       path: { type: "string", description: "Ruta concreta que empieza con '/', con los IDs reales sustituidos (sin {placeholders})." },
@@ -4895,6 +5075,10 @@ export const INITIAL_TOOLS = [
       "/api/v1/availability · /api/v1/availability/calendar · /api/v1/reservations · /api/v1/reservations/unassigned · /api/v1/reservations/<reservationId> · /api/v1/reservations/<reservationId>/services · " +
       "/api/v1/rate-plans · /api/v1/rate-plans/<ratePlanId> · /api/v1/promos · /api/v1/promos/<promoId> · /api/v1/engine-settings · /api/v1/reports/dashboard · " +
       "/api/v1/exchange-rates/preview · /api/v1/categories · /api/v1/migrations/open · /api/v1/migrations/<draftId> · /api/v1/unit-migrations/open · /api/v1/unit-migrations/<draftId> · /api/v1/units. " +
+      "OJO: /api/v1/availability exige query checkIn y checkOut (YYYY-MM-DD) y acepta adults/children. " +
+      "LO QUE VE EL HUESPED en el motor de la web (sin login): /api/v1/availability/public-calendar (query start, end —hasta 120 dias—, adults, children: cupo, precio y restricciones por dia tal como los recibe el calendario de la web) · " +
+      "/api/v1/engine-settings/public · /api/v1/public/properties/<propertyId>/promotions. " +
+      "Para explicar por que un huesped no puede elegir una fecha, usa diagnose_booking_calendar: aplica las reglas del calendario de la web. " +
       "Preferi las tools especificas cuando existan.",
     inputSchema: obj({
       path: { type: "string", description: "Ruta concreta que empieza con '/', con los IDs reales sustituidos (sin {placeholders})." },
@@ -4912,6 +5096,7 @@ export const INITIAL_TOOLS = [
       "GET a CUALQUIER endpoint de rooms-app (inventario de habitaciones). Pasa `path` con los IDs sustituidos. Familias de rutas: " +
       "/api/v1/properties/<propertyId>/units · /api/v1/properties/<propertyId>/units/states · /api/v1/properties/<propertyId>/units/<unitId> · /api/v1/properties/<propertyId>/units/<unitId>/history · " +
       "/api/v1/properties/<propertyId>/categories · /api/v1/properties/<propertyId>/categories/<categoryId> · /api/v1/properties/<propertyId>/model-audit. " +
+      "Publico (lo que ve la web del hotel): /api/v1/public/properties/<propertyId>/categories · /api/v1/public/properties/<propertyId>/units. " +
       "Preferi las tools especificas (get_room_states, list_units, list_room_categories) cuando existan.",
     inputSchema: obj({
       path: { type: "string", description: "Ruta concreta que empieza con '/', con los IDs reales sustituidos (sin {placeholders})." },

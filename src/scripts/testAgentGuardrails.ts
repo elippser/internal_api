@@ -16,15 +16,21 @@
  */
 import {
   flatten,
+  mergeFixedProps,
   parseEdits,
   resolveLeaf,
   BUILDER_EDITOR_TOOLS,
 } from "../modules/conversations/services/builderEditor";
 import {
+  ENGINE_DIAGNOSIS_TOOLS,
+  describeEngineStudio,
+} from "../modules/conversations/services/engineCalendarDiagnosis";
+import {
   confirmationFor,
   typedAnswerMatches,
 } from "../modules/conversations/services/confirmationPolicy";
 import { INITIAL_TOOLS } from "../modules/tools/tools.model";
+import { withUpstreamDetail } from "../modules/conversations/services/toolExecutor";
 
 let failed = 0;
 function check(name: string, cond: boolean, detail?: string): void {
@@ -204,6 +210,50 @@ console.log("\n=== confirmación dura ===");
   check("la comparación escrita rechaza vacío", !typedAnswerMatches("site-42", ""));
 }
 
+console.log("\n=== errores del servicio: el motivo tiene que llegar al modelo ===");
+{
+  // Caso real del 12-09-2026: el modelo recibía sólo "respondio 400", reintentó
+  // cuatro veces a ciegas y le dijo al usuario que el sistema lo rechazaba.
+  const base = "Upstream booking-app respondio 400";
+  check(
+    "incluye `error` + `details` del cuerpo Joi",
+    withUpstreamDetail(base, {
+      error: "Validación fallida",
+      details: ["checkInTime debe tener formato HH:mm"],
+    }) === `${base}: Validación fallida · checkInTime debe tener formato HH:mm`,
+  );
+  check(
+    "incluye un `error` simple",
+    withUpstreamDetail(base, { error: "propertyId es requerido" }) === `${base}: propertyId es requerido`,
+  );
+  check(
+    "acepta details como objetos { message }",
+    withUpstreamDetail(base, { details: [{ message: "\"x\" is not allowed" }] }).endsWith('"x" is not allowed'),
+  );
+  check("un cuerpo string se usa tal cual", withUpstreamDetail(base, "boom") === `${base}: boom`);
+  check("un HTML de error no ensucia el mensaje", withUpstreamDetail(base, "<!DOCTYPE html><html>…") === base);
+  check("sin cuerpo queda el mensaje original", withUpstreamDetail(base, null) === base);
+}
+
+console.log("\n=== contrato de propertyId en escrituras que lo leen de la query ===");
+{
+  // booking-app/engineSettingsController lee propertyId de req.query en el PUT.
+  // Sin `?propertyId={propertyId}` en el template, el ejecutor lo mete en el
+  // body y el servicio responde 400 en TODA escritura (así estuvo hasta el
+  // 12-09-2026). verify:tool-coverage lo detecta contra los controllers reales;
+  // esto lo fija sin depender de tener los repos hermanos.
+  const t = (INITIAL_TOOLS as any[]).find((x) => x.name === "update_engine_settings");
+  check(
+    "update_engine_settings manda propertyId por query",
+    Boolean(t && /\?propertyId=\{propertyId\}/.test(t.execution.pathTemplate)),
+    t?.execution.pathTemplate,
+  );
+  check(
+    "update_engine_settings expone los horarios",
+    Boolean(t?.inputSchema?.properties?.checkInTime && t?.inputSchema?.properties?.checkOutTime),
+  );
+}
+
 console.log("\n=== cobertura del gate sobre el catálogo ===");
 {
   const tools = INITIAL_TOOLS as any[];
@@ -254,6 +304,53 @@ console.log("\n=== cobertura del gate sobre el catálogo ===");
     faltantes.length === 0,
     faltantes.join(", "),
   );
+
+  const faltanDiagnostico = [...ENGINE_DIAGNOSIS_TOOLS].filter((n) => !nombres.has(n));
+  check(
+    "las tools nativas de diagnóstico del motor están en el catálogo",
+    faltanDiagnostico.length === 0,
+    faltanDiagnostico.join(", "),
+  );
+}
+
+// "Arreglar todo" guarda lo que devuelve el lint del servidor. Tiene que valer
+// lo mismo que para edit_page_content: nunca cambia la estructura de la página.
+console.log("\n=== Arreglar todo (calidad del sitio): solo props de secciones existentes ===");
+{
+  const actual = [
+    { name: "Hero", type: "hero", priority: 0, props: { title: "Hola", image: { alt: "" } } },
+    { name: "Rooms", type: "grid", priority: 1, props: { items: [] } },
+  ];
+  const corregido = [
+    { name: "OTRO", type: "otro", props: { title: "Hola", image: { alt: "Frente del hotel" } } },
+    { props: { items: [] } },
+  ];
+  const merged = mergeFixedProps(actual, corregido);
+  check("con cambios devuelve la lista corregida", Array.isArray(merged) && merged.length === 2);
+  check(
+    "de cada sección solo cambian los props (name/type/priority quedan)",
+    !!merged && merged[0].name === "Hero" && merged[0].type === "hero" && merged[0].priority === 0 &&
+      merged[0].props.image.alt === "Frente del hotel",
+  );
+  check("una sección sin cambios queda idéntica (misma referencia)", !!merged && merged[1] === actual[1]);
+  check("sin cambios no escribe (null)", mergeFixedProps(actual, actual) === null);
+  check(
+    "si el servidor devuelve otra cantidad de secciones no escribe (null)",
+    mergeFixedProps(actual, [...corregido, { props: {} }]) === null && mergeFixedProps(actual, corregido.slice(0, 1)) === null,
+  );
+  check("con algo que no es lista no escribe (null)", mergeFixedProps(actual, { page: [] }) === null);
+}
+
+// El 13-09-2026 el agente leyó el null del Estudio del Motor como "no pude leer
+// la configuración". Sin personalizar tiene que decir que rigen los defaults.
+console.log("\n=== Estudio del Motor sin personalizar ===");
+{
+  const vacio = describeEngineStudio(null);
+  check("null = no configurado", vacio.configured === false);
+  check("null = calendario informativo encendido por defecto", vacio.effective.calendar.enabled === true);
+  check("la nota aclara que no es un error de lectura", /NO es un error/.test(vacio.note));
+  const apagado = describeEngineStudio({ calendar: { enabled: false } });
+  check("respeta un calendario apagado", apagado.configured && apagado.effective.calendar.enabled === false);
 }
 
 console.log(

@@ -14,6 +14,12 @@ import {
   BuilderEditError,
   runBuilderTool,
 } from "./builderEditor";
+import {
+  ENGINE_DIAGNOSIS_TOOLS,
+  EngineDiagnosisError,
+  describeEngineStudio,
+  runEngineDiagnosisTool,
+} from "./engineCalendarDiagnosis";
 
 export interface AnthropicTool {
   name: string;
@@ -258,6 +264,14 @@ export interface ExecuteContext {
   // Saltear la política de acceso (sólo scripts de test/seed que ejecutan con
   // una identidad técnica). Por defecto, con userId presente, SIEMPRE se evalúa.
   skipAccessPolicy?: boolean;
+  // Definición de la tool a usar en vez de la guardada en la base. Sólo scripts
+  // de test (test:tools-e2e): prueban el catálogo del CÓDIGO antes de
+  // publicarlo, sin escribir en la colección `tools` compartida con producción.
+  toolDef?: any;
+  // Corre todo (política, path, propertyId, JWT) y devuelve el request armado
+  // SIN mandarlo. Lo usa test:tools-e2e para validar el contrato de cada
+  // escritura contra los routers reales sin tocar datos.
+  dryRun?: boolean;
 }
 
 export type ToolErrorKind =
@@ -292,6 +306,66 @@ function mapStatusToKind(status: number): ToolErrorKind {
   return "unknown";
 }
 
+/**
+ * Suma al mensaje el MOTIVO que devolvió el servicio.
+ *
+ * Antes el modelo recibía sólo "Upstream booking-app respondio 400": el Joi del
+ * servicio decía exactamente qué faltaba ("propertyId es requerido", "checkInTime
+ * debe tener formato HH:mm") pero ese cuerpo quedaba en `upstream` y nadie lo
+ * leía. Sin el motivo el agente no puede corregir: reintentaba a ciegas, probaba
+ * otro método, mandaba el body como string, y le terminaba diciendo al usuario
+ * que "el sistema rechazó el cambio" cuatro veces seguidas.
+ */
+export function withUpstreamDetail(message: string, upstream: unknown): string {
+  let detail = "";
+  if (typeof upstream === "string") {
+    detail = upstream.trim().slice(0, 400);
+  } else if (upstream && typeof upstream === "object") {
+    const u = upstream as Record<string, unknown>;
+    const parts: string[] = [];
+    for (const key of ["error", "message", "msg"]) {
+      const v = u[key];
+      if (typeof v === "string" && v.trim()) parts.push(v.trim());
+      else if (v && typeof v === "object" && typeof (v as any).message === "string") parts.push((v as any).message);
+    }
+    const details = u.details ?? u.errors;
+    if (Array.isArray(details)) {
+      for (const d of details.slice(0, 6)) {
+        if (typeof d === "string") parts.push(d);
+        else if (d && typeof d === "object" && typeof (d as any).message === "string") parts.push((d as any).message);
+      }
+    }
+    detail = [...new Set(parts)].join(" · ").slice(0, 600);
+  }
+  // Un HTML de error (proxy caído) no le sirve al modelo.
+  if (!detail || /^<!doctype|^<html/i.test(detail)) return message;
+  return `${message}: ${detail}`;
+}
+
+/** Lecturas donde el 404 del servicio significa "no hay ninguno", no un error. */
+const NONE_ON_404: Record<string, string> = {
+  get_open_currency_migration: "No hay ninguna migración de moneda base abierta para esta propiedad.",
+  get_open_unit_migration: "No hay ninguna migración del modelo de unidades abierta para esta propiedad.",
+};
+
+/** JWT delegado del usuario de la sesión (undefined sin userId). */
+async function delegatedJwt(ctx: ExecuteContext): Promise<string | undefined> {
+  if (!ctx.userId) return undefined;
+  try {
+    return await mintAgentJwt({
+      userId: ctx.userId,
+      companyId: ctx.companyId,
+      agentId: ctx.agentId,
+      sessionId: ctx.sessionId,
+    });
+  } catch (err) {
+    if (err instanceof AgentJwtError) {
+      throw new ToolExecutionError("config", 500, err.message);
+    }
+    throw err;
+  }
+}
+
 // Reemplaza {placeholders} del pathTemplate con args y context.
 // Los placeholders consumidos se remueven de la query.
 function buildPath(
@@ -322,7 +396,7 @@ export async function executeTool(
   args: Record<string, unknown>,
   ctx: ExecuteContext,
 ): Promise<unknown> {
-  const tool = await Tool.findOne({ name: toolName });
+  const tool = ctx.toolDef ?? (await Tool.findOne({ name: toolName }));
   if (!tool) {
     throw new ToolExecutionError(
       "not_found",
@@ -371,32 +445,27 @@ export async function executeTool(
   // dejan tocar hojas que ya existen (ver el comentario de cabecera de ese
   // modulo). La politica de acceso ya corrio arriba usando el pathTemplate
   // declarado — que es el endpoint real que terminan escribiendo.
-  if (BUILDER_EDITOR_TOOLS.has(tool.name)) {
-    let builderJwt: string | undefined;
-    if (ctx.userId) {
-      try {
-        builderJwt = await mintAgentJwt({
-          userId: ctx.userId,
-          companyId: ctx.companyId,
-          agentId: ctx.agentId,
-          sessionId: ctx.sessionId,
-        });
-      } catch (err) {
-        if (err instanceof AgentJwtError) {
-          throw new ToolExecutionError("config", 500, err.message);
-        }
-        throw err;
-      }
-    }
+  // Tools nativas (resueltas acá dentro, no un passthrough): la política ya corrió
+  // arriba contra el pathTemplate declarado. En dry-run no se ejecutan: leen y
+  // escriben en varios pasos y no hay un único request que devolver.
+  const isBuilderTool = BUILDER_EDITOR_TOOLS.has(tool.name);
+  const isDiagnosisTool = ENGINE_DIAGNOSIS_TOOLS.has(tool.name);
+  if ((isBuilderTool || isDiagnosisTool) && ctx.dryRun) {
+    return { dryRun: true, native: tool.name };
+  }
+  if (isBuilderTool || isDiagnosisTool) {
+    const nativeJwt = await delegatedJwt(ctx);
     try {
-      return await runBuilderTool(tool.name, args, { agentJwt: builderJwt });
+      return isBuilderTool
+        ? await runBuilderTool(tool.name, args, { agentJwt: nativeJwt })
+        : await runEngineDiagnosisTool(tool.name, args, { propertyId: ctx.propertyId, agentJwt: nativeJwt });
     } catch (err) {
-      if (err instanceof BuilderEditError) {
+      if (err instanceof BuilderEditError || err instanceof EngineDiagnosisError) {
         throw new ToolExecutionError("validation", 400, err.message);
       }
       if (err instanceof PmsProxyError) {
         const kind = err.status === 502 ? "network" : mapStatusToKind(err.status);
-        throw new ToolExecutionError(kind, err.status, err.message, err.upstream);
+        throw new ToolExecutionError(kind, err.status, withUpstreamDetail(err.message, err.upstream), err.upstream);
       }
       throw err;
     }
@@ -462,6 +531,21 @@ export async function executeTool(
       }
       rawMethod = m || "POST";
       rawBody = args.body;
+      // Los modelos a veces mandan el body como JSON SERIALIZADO en vez de
+      // objeto. Así llegaba al servicio un string entre comillas y Joi lo
+      // rechazaba sin que se entendiera por qué. Si parsea, se usa el objeto.
+      if (typeof args.body === "string" && args.body.trim()) {
+        const serialized = args.body;
+        try {
+          rawBody = JSON.parse(serialized);
+        } catch {
+          throw new ToolExecutionError(
+            "validation",
+            400,
+            `El "body" de "${toolName}" tiene que ser un objeto JSON, no texto. Recibido: ${serialized.slice(0, 200)}`,
+          );
+        }
+      }
     }
     // Inyectar propertyId en la query si el destino no lo trae ya. booking-app
     // exige ?propertyId= en sus reads (rate-plans, promos, etc.); pms-core y
@@ -512,7 +596,9 @@ export async function executeTool(
       ctx.propertyId &&
       !pathHasProperty &&
       remainingArgs.propertyId === undefined &&
-      (isReadMethod || declaresProperty)
+      (isReadMethod || declaresProperty) &&
+      // Endpoints cross-property cuyo Joi strict rechaza propertyId.
+      tool.execution.injectPropertyId !== false
     ) {
       remainingArgs.propertyId = ctx.propertyId;
     }
@@ -529,22 +615,19 @@ export async function executeTool(
   // Identidad delegada: si la tool requiere staff_jwt y tenemos userId
   // verificado, minteamos un JWT corto y lo adjuntamos. Si no, dejamos sin
   // Authorization (solo funcionan los endpoints publicos como GET /availability).
-  let agentJwt: string | undefined;
   const needsAuth = tool.execution.authStrategy !== "none";
-  if (needsAuth && ctx.userId) {
-    try {
-      agentJwt = await mintAgentJwt({
-        userId: ctx.userId,
-        companyId: ctx.companyId,
-        agentId: ctx.agentId,
-        sessionId: ctx.sessionId,
-      });
-    } catch (err) {
-      if (err instanceof AgentJwtError) {
-        throw new ToolExecutionError("config", 500, err.message);
-      }
-      throw err;
-    }
+  const agentJwt = needsAuth ? await delegatedJwt(ctx) : undefined;
+
+  if (ctx.dryRun) {
+    return {
+      dryRun: true,
+      service: tool.execution.targetService,
+      method,
+      path,
+      query: isRead ? remainingArgs : undefined,
+      body: isRead ? undefined : writeBody,
+      authenticated: Boolean(agentJwt),
+    };
   }
 
   try {
@@ -564,6 +647,20 @@ export async function executeTool(
       timeoutMs: tool.execution.timeout ?? 10000,
       agentJwt,
     });
+    // El Estudio del Motor devuelve null si el sitio nunca lo personalizó, y el
+    // modelo lo leía como "no pude leer la configuración". Se devuelve la config
+    // efectiva con los defaults y una nota explícita.
+    if (toolName === "get_site_engine_studio") {
+      return describeEngineStudio(result);
+    }
+    if (toolName === "get_site_whatsapp_button" && (result === null || result === "")) {
+      return {
+        configured: false,
+        note:
+          "Este sitio no tiene configurado el botón flotante de WhatsApp: la lectura funcionó y devolvió vacío, NO es un error. " +
+          "Se configura con update_site_whatsapp_button.",
+      };
+    }
     // Reducir resultados pesados del web-builder (arboles de componentes) antes
     // de devolverlos: evita el overflow de contexto (>200k tokens).
     if (SITE_REDUCE_TOOLS.has(toolName)) {
@@ -590,8 +687,13 @@ export async function executeTool(
     return result;
   } catch (err) {
     if (err instanceof PmsProxyError) {
+      // "No hay ninguno abierto" no es un error. Sin borrador el servicio
+      // responde 404 y el modelo lo contaba como una lectura rota.
+      if (err.status === 404 && NONE_ON_404[toolName]) {
+        return { found: false, message: NONE_ON_404[toolName] };
+      }
       const kind = err.status === 502 ? "network" : mapStatusToKind(err.status);
-      throw new ToolExecutionError(kind, err.status, err.message, err.upstream);
+      throw new ToolExecutionError(kind, err.status, withUpstreamDetail(err.message, err.upstream), err.upstream);
     }
     throw err;
   }
