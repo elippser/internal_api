@@ -19,17 +19,48 @@ export const createSessionSchema = Joi.object({
   }).required(),
 });
 
+// Lo que el navegador extrajo de un video o un audio: fotogramas JPEG y la
+// pista de sonido en WAV (ver services/mediaDigest.service.ts).
+const attachmentMediaSchema = Joi.object({
+  durationSec: Joi.number().min(0).max(86_400).allow(null),
+  frames: Joi.array()
+    .items(
+      Joi.object({
+        atSec: Joi.number().min(0).max(86_400).required(),
+        jpegB64: Joi.string().max(800_000).required(),
+      }),
+    )
+    .max(16)
+    .default([]),
+  audioWavB64: Joi.string().allow("").max(4_500_000),
+  audioSeconds: Joi.number().min(0).max(86_400),
+});
+
 export const postMessageSchema = Joi.object({
   content: Joi.string().allow("").max(10_000).default(""),
-  // Adjuntos inline (imagen/PDF/CSV) en base64. Límite por ítem ~7MB base64
-  // (~5MB binario) y hasta 5 archivos por mensaje.
+  // Adjuntos inline en base64, hasta 5 por mensaje. Imagen, PDF y texto viajan
+  // tal cual en `dataB64`; video y audio viajan ya reducidos en `media` (el
+  // archivo original no entra en el pedido). Los topes son de red de seguridad:
+  // el techo real es el del pedido entero (4,5 MB en Vercel) y lo controla el
+  // navegador antes de mandar.
   attachments: Joi.array()
     .items(
       Joi.object({
-        kind: Joi.string().valid("image", "document").required(),
+        kind: Joi.string()
+          .valid("image", "document", "video", "audio")
+          .required(),
         name: Joi.string().allow("").max(255).default(""),
         mediaType: Joi.string().max(100).required(),
-        dataB64: Joi.string().max(7_000_000).required(),
+        dataB64: Joi.when("kind", {
+          is: Joi.valid("video", "audio"),
+          then: Joi.string().allow("").max(7_000_000).default(""),
+          otherwise: Joi.string().max(7_000_000).required(),
+        }),
+        media: Joi.when("kind", {
+          is: Joi.valid("video", "audio"),
+          then: attachmentMediaSchema.required(),
+          otherwise: Joi.forbidden(),
+        }),
       }),
     )
     .max(5)

@@ -1,0 +1,288 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "elevation": 763,
+    "timezone": "America/Argentina/Mendoza",
+    "hemisphere": "south",
+    "oceanWithinKm": null
+  },
+  "normals": [
+    {
+      "month": 1,
+      "tMax": 30.3,
+      "tMin": 20.3,
+      "tMean": 25.3,
+      "precipMm": 51.7,
+      "rainDays": 7,
+      "snowCm": 0,
+      "humidityPct": 43.8,
+      "sunshineHours": 12.6,
+      "daylightHours": 13.9,
+      "uvIndex": 3.1,
+      "tRecordHigh": 43,
+      "tRecordLow": 5.9
+    },
+    {
+      "month": 2,
+      "tMax": 29,
+      "tMin": 19.3,
+      "tMean": 24.1,
+      "precipMm": 25.6,
+      "rainDays": 5.2,
+      "snowCm": 0,
+      "humidityPct": 47.1,
+      "sunshineHours": 11.7,
+      "daylightHours": 13.2,
+      "uvIndex": 2.7,
+      "tRecordHigh": 41.1,
+      "tRecordLow": 7.6
+    },
+    {
+      "month": 3,
+      "tMax": 25.7,
+      "tMin": 16.2,
+      "tMean": 20.9,
+      "precipMm": 35.7,
+      "rainDays": 6.2,
+      "snowCm": 0,
+      "humidityPct": 52,
+      "sunshineHours": 10.5,
+      "daylightHours": 12.2,
+      "uvIndex": 2,
+      "tRecordHigh": 38.3,
+      "tRecordLow": 5.6
+    },
+    {
+      "month": 4,
+      "tMax": 20.7,
+      "tMin": 12,
+      "tMean": 16.3,
+      "precipMm": 29.7,
+      "rainDays": 5,
+      "snowCm": 0,
+      "humidityPct": 58,
+      "sunshineHours": 9.4,
+      "daylightHours": 11.2,
+      "uvIndex": 1.2,
+      "tRecordHigh": 33.6,
+      "tRecordLow": 0.3
+    },
+    {
+      "month": 5,
+      "tMax": 15.6,
+      "tMin": 8,
+      "tMean": 11.8,
+      "precipMm": 30.2,
+      "rainDays": 5.4,
+      "snowCm": 0,
+      "humidityPct": 60.8,
+      "sunshineHours": 8.3,
+      "daylightHours": 10.3,
+      "uvIndex": 0.7,
+      "tRecordHigh": 31.8,
+      "tRecordLow": -4.2
+    },
+    {
+      "month": 6,
+      "tMax": 12.3,
+      "tMin": 4.3,
+      "tMean": 8.3,
+      "precipMm": 13.1,
+      "rainDays": 3.2,
+      "snowCm": 0.3,
+      "humidityPct": 58.2,
+      "sunshineHours": 8.4,
+      "daylightHours": 9.8,
+      "uvIndex": 0.5,
+      "tRecordHigh": 31,
+      "tRecordLow": -3.5
+    },
+    {
+      "month": 7,
+      "tMax": 12.3,
+      "tMin": 3.7,
+      "tMean": 8,
+      "precipMm": 9.6,
+      "rainDays": 2.9,
+      "snowCm": 0.7,
+      "humidityPct": 54.2,
+      "sunshineHours": 8.9,
+      "daylightHours": 10,
+      "uvIndex": 0.6,
+      "tRecordHigh": 30.3,
+      "tRecordLow": -5.4
+    },
+    {
+      "month": 8,
+      "tMax": 16.2,
+      "tMin": 6.1,
+      "tMean": 11.2,
+      "precipMm": 18.1,
+      "rainDays": 2.8,
+      "snowCm": 0.2,
+      "humidityPct": 43.1,
+      "sunshineHours": 9.7,
+      "daylightHours": 10.8,
+      "uvIndex": 0.9,
+      "tRecordHigh": 33.9,
+      "tRecordLow": -4.5
+    },
+    {
+      "month": 9,
+      "tMax": 20.2,
+      "tMin": 9,
+      "tMean": 14.6,
+      "precipMm": 10.1,
+      "rainDays": 2.9,
+      "snowCm": 0,
+      "humidityPct": 38.2,
+      "sunshineHours": 10.6,
+      "daylightHours": 11.8,
+      "uvIndex": 1.4,
+      "tRecordHigh": 37.2,
+      "tRecordLow": -1.5
+    },
+    {
+      "month": 10,
+      "tMax": 23.6,
+      "tMin": 12.2,
+      "tMean": 17.9,
+      "precipMm": 26.6,
+      "rainDays": 4.8,
+      "snowCm": 0,
+      "humidityPct": 37.4,
+      "sunshineHours": 11.8,
+      "daylightHours": 12.8,
+      "uvIndex": 2.1,
+      "tRecordHigh": 40.2,
+      "tRecordLow": 2.9
+    },
+    {
+      "month": 11,
+      "tMax": 27.6,
+      "tMin": 16.1,
+      "tMean": 21.9,
+      "precipMm": 25.6,
+      "rainDays": 4.2,
+      "snowCm": 0,
+      "humidityPct": 36.9,
+      "sunshineHours": 12.4,
+      "daylightHours": 13.7,
+      "uvIndex": 2.7,
+      "tRecordHigh": 39,
+      "tRecordLow": 5
+    },
+    {
+      "month": 12,
+      "tMax": 29.9,
+      "tMin": 18.7,
+      "tMean": 24.3,
+      "precipMm": 22.9,
+      "rainDays": 4.3,
+      "snowCm": 0,
+      "humidityPct": 36.8,
+      "sunshineHours": 12.7,
+      "daylightHours": 14.2,
+      "uvIndex": 3.1,
+      "tRecordHigh": 42.4,
+      "tRecordLow": 4.8
+    }
+  ],
+  "seasons": {
+    "profile": "temperate",
+    "amplitudeC": 17.3,
+    "annualPrecipMm": 298.9,
+    "warmest": [
+      12,
+      1,
+      2
+    ],
+    "coldest": [
+      6,
+      7,
+      8
+    ],
+    "wet": [
+      1,
+      3
+    ],
+    "dry": [
+      6,
+      7,
+      9
+    ],
+    "snow": [],
+    "best": [
+      9,
+      10,
+      11
+    ],
+    "monsoonal": false
+  },
+  "hazards": {
+    "hurricane": null,
+    "tornado": null,
+    "fireRisk": [
+      2,
+      10,
+      11,
+      12
+    ]
+  },
+  "special": {
+    "foliage": [
+      4,
+      5
+    ],
+    "bloom": [
+      9,
+      10
+    ]
+  },
+  "enso": {
+    "phase": "El Niño",
+    "oni": 1.8,
+    "period": "JJA 2026",
+    "strength": "strong"
+  },
+  "climateShift": {
+    "baseline": "1981-1990",
+    "recent": "2016-2025",
+    "annualDeltaC": 0.1,
+    "monthlyDeltaC": [
+      0.7,
+      0.6,
+      0.3,
+      -0.3,
+      -0.6,
+      -0.7,
+      -0.4,
+      0.1,
+      1.4,
+      -0.2,
+      0.2,
+      -0.3
+    ],
+    "trendCPerDecade": 0
+  },
+  "current": {
+    "airQuality": {
+      "europeanAqi": 41,
+      "usAqi": 52,
+      "pm25": 16.2,
+      "pm10": 29.5,
+      "ozone": 4
+    },
+    "pollen": null,
+    "snowDepthCm": 0,
+    "uvIndexMaxToday": 6.85
+  },
+  "sources": [
+    "Open-Meteo Archive / ERA5 (2016-2025)",
+    "NASA POWER",
+    "NOAA CPC (ONI)",
+    "Open-Meteo Air Quality (CAMS)"
+  ],
+  "timestamp": "2026-09-14T05:00:15.740Z"
+}

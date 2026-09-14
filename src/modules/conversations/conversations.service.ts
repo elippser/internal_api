@@ -20,6 +20,20 @@ import { typedAnswerMatches } from "./services/confirmationPolicy";
 import { routeTurn } from "./services/taskRouter";
 import { prepareStrategicTurn } from "../growth/strategicTurn";
 import {
+  STRATEGIC_TOURISM_FACETS,
+  TOURISM_ENRICH_NOTE,
+  TOURISM_PREP_BUDGET_MS,
+  TOURISM_STATUS_BLOCK,
+  TOURISM_STEP_LABEL,
+  TOURISM_STRATEGIC_BUDGET_MS,
+  prepareTourismContext,
+  tourismModel,
+  tourismProfile,
+  tourismSpecialization,
+  type TourismMode,
+  type TourismTurnContext,
+} from "../tourism/tourismTurn";
+import {
   getActivePlan,
   markStep,
   renderActivePlanBlock,
@@ -41,6 +55,12 @@ import {
   planCreditsService,
 } from "../plans/planCredits.service";
 import { memoryService } from "../memory/memory.service";
+import { modelFor, tierOf } from "../../shared/llm/provider";
+import {
+  digestMedia,
+  formatSeconds,
+  type MediaFrame,
+} from "./services/mediaDigest.service";
 
 const HISTORY_WINDOW = Number(
   process.env.CONVERSATION_HISTORY_WINDOW ?? 20,
@@ -84,32 +104,65 @@ export interface TurnStreamHandlers {
   onStep?: (e: StepEvent) => void;
   onDelta?: (text: string) => void;
   onTextEnd?: () => void;
+  /**
+   * Tarjeta armada por el código ANTES de que el modelo escriba (hoy: el estado
+   * turístico). El cliente la muestra enseguida y la síntesis se escribe adentro.
+   */
+  onCard?: (block: { tool: string; result: unknown }) => void;
 }
 
-// Adjunto del usuario (imagen, PDF o CSV) que se manda inline al modelo.
+// Adjunto del usuario. Imagen, PDF y texto traen el archivo en `dataB64`.
+// Video y audio traen lo que el navegador extrajo (fotogramas + pista de
+// sonido) en `media`, y antes del turno se convierten en un informe escrito
+// (services/mediaDigest.service.ts): el protocolo del chat no los transporta.
 interface MessageAttachment {
-  kind: "image" | "document";
+  kind: "image" | "document" | "video" | "audio";
   name?: string;
   mediaType: string;
   dataB64: string;
+  media?: {
+    durationSec?: number | null;
+    frames?: MediaFrame[];
+    audioWavB64?: string;
+    audioSeconds?: number;
+  };
 }
 
 // Media types que van al modelo como documento de TEXTO (la API solo acepta
-// base64 para imágenes y PDF; un CSV base64 daría 400).
+// base64 para imágenes y PDF; un CSV base64 daría 400). Todo `text/*` entra
+// solo; esta lista es para los formatos de texto que el SO etiqueta como
+// `application/*`. El chat del PMS ya normaliza a text/plain o text/csv.
 const TEXT_ATTACHMENT_TYPES = new Set([
-  "text/csv",
-  "text/plain",
-  "text/tab-separated-values",
+  "application/json",
+  "application/xml",
+  "application/yaml",
+  "application/x-yaml",
+  "application/javascript",
+  "application/sql",
+  "image/svg+xml",
 ]);
 
 // Tope de caracteres del texto decodificado (~50k tokens). Un CSV grande no
 // entra en contexto; preferimos truncar con aviso a que el turno muera.
 const TEXT_ATTACHMENT_MAX_CHARS = 200_000;
 
+// Tope del informe de videos/audios que se guarda para los turnos siguientes.
+const ATTACHMENT_CONTEXT_MAX_CHARS = 12_000;
+
 function isTextAttachment(a: MessageAttachment): boolean {
+  const type = (a.mediaType || "").toLowerCase();
   return (
-    TEXT_ATTACHMENT_TYPES.has((a.mediaType || "").toLowerCase()) ||
-    /\.(csv|tsv|txt)$/i.test(a.name ?? "")
+    type.startsWith("text/") ||
+    TEXT_ATTACHMENT_TYPES.has(type) ||
+    /\.(csv|tsv|txt|md|json|xml|ya?ml|log)$/i.test(a.name ?? "")
+  );
+}
+
+// Una imagen o un PDF viajan como bytes al modelo: el turno necesita uno que
+// vea. Texto, video y audio llegan como texto (el video ya leído).
+function needsVision(attachments: MessageAttachment[]): boolean {
+  return attachments.some(
+    (a) => a.kind === "image" || (a.kind === "document" && !isTextAttachment(a)),
   );
 }
 
@@ -245,8 +298,110 @@ export const conversationsService = {
         (attachments.length ? "Archivo adjunto" : "");
     }
 
+    // Videos y audios: el modelo del chat no los recibe, así que antes del
+    // turno se leen y se vuelven texto (ver services/mediaDigest.service.ts).
+    // Van en paralelo, y uno que no se pudo leer NO tumba el turno: entra como
+    // aviso, para que el asistente se lo diga al usuario en vez de contestar
+    // como si lo hubiera visto.
+    const mediaAttachments = attachments.filter(
+      (a) => a.kind === "video" || a.kind === "audio",
+    );
+    const mediaReports = new Map<MessageAttachment, string>();
+    if (mediaAttachments.length) {
+      const allVideo = mediaAttachments.every((a) => a.kind === "video");
+      const allAudio = mediaAttachments.every((a) => a.kind === "audio");
+      stream?.onStep?.({
+        kind: "server_tool",
+        toolName: "media_digest",
+        label: allVideo
+          ? mediaAttachments.length > 1
+            ? "Mirando los videos…"
+            : "Mirando el video…"
+          : allAudio
+            ? mediaAttachments.length > 1
+              ? "Escuchando los audios…"
+              : "Escuchando el audio…"
+            : "Revisando los archivos…",
+      });
+
+      const outcomes = await Promise.all(
+        mediaAttachments.map(async (a) => {
+          const kind = a.kind as "video" | "audio";
+          try {
+            const r = await digestMedia({
+              kind,
+              name: a.name,
+              durationSec: a.media?.durationSec ?? undefined,
+              frames: a.media?.frames,
+              audioWavB64: a.media?.audioWavB64 || undefined,
+              audioSeconds: a.media?.audioSeconds,
+              userText: content,
+            });
+            return { a, kind, r, error: null as string | null };
+          } catch (err) {
+            const error = err instanceof Error ? err.message : String(err);
+            console.warn(`[conversations] no se pudo leer el ${kind} "${a.name}": ${error}`);
+            return { a, kind, r: null, error };
+          }
+        }),
+      );
+
+      let digestIn = 0;
+      let digestOut = 0;
+      let digestMs = 0;
+      let digestModel = "";
+      for (const o of outcomes) {
+        const label = `${o.kind === "video" ? "el video" : "el audio"} "${o.a.name || o.kind}"`;
+        if (o.r) {
+          digestIn += o.r.inputTokens;
+          digestOut += o.r.outputTokens;
+          digestMs += o.r.ms;
+          digestModel = o.r.model;
+          mediaReports.set(
+            o.a,
+            `Lectura de ${label} (dura ${formatSeconds(o.a.media?.durationSec ?? undefined)}). ` +
+              `La hizo otro modelo que ve y escucha: vos no tenés el archivo, sólo este informe.\n\n${o.r.text}`,
+          );
+        } else {
+          mediaReports.set(
+            o.a,
+            `El usuario adjuntó ${label}, pero no se pudo leer (${o.error}). ` +
+              "Decile que no pudiste verlo y pedile que lo intente de nuevo o que cuente qué muestra.",
+          );
+        }
+      }
+
+      // Consumo de la lectura: es un llamado aparte, con su propio modelo y
+      // precio. Mismo criterio que el del turno: nunca rompe el turno.
+      if (digestModel) {
+        try {
+          await usageService.record({
+            source: "conversation_agent",
+            agentId: agent.agentId,
+            agentSlug: agent.slug,
+            model: digestModel,
+            companyId: session.context.companyId ?? "unknown",
+            propertyId: session.context.propertyId ?? null,
+            userId: session.context.userId ?? null,
+            userRole: session.context.userRole ?? null,
+            conversationId: session.sessionId,
+            sessionId: session.sessionId,
+            turnIndex: session.turnCount + 1,
+            inputTokens: digestIn,
+            outputTokens: digestOut,
+            latencyMs: digestMs,
+            toolCallCount: 0,
+            occurredAt: new Date(),
+          });
+        } catch (err) {
+          console.error("[usage] no se pudo registrar la lectura de adjuntos:", err);
+        }
+      }
+    }
+
     // Persistir mensaje del usuario. NO guardamos el base64 de los adjuntos
-    // (pesado): dejamos el texto, o una nota si solo hubo archivos.
+    // (pesado): dejamos el texto, o una nota si solo hubo archivos. De los
+    // videos y audios sí queda el informe, para los turnos siguientes.
     const persistedUserText =
       content.trim() ||
       (attachments.length
@@ -258,6 +413,9 @@ export const conversationsService = {
       agentId: session.agentId,
       role: "user",
       content: persistedUserText,
+      attachmentContext: [...mediaReports.values()]
+        .join("\n\n---\n\n")
+        .slice(0, ATTACHMENT_CONTEXT_MAX_CHARS),
       createdAt: new Date(),
     });
 
@@ -365,6 +523,46 @@ export const conversationsService = {
     // entrega la foto ya resuelta, las estrategias que aplican y el índice de
     // palancas que puede proponer. Si la preparación falla (no se pudo leer la
     // propiedad), se sigue con el turno normal: peor respuesta, pero respuesta.
+    // ── Estado turístico ─────────────────────────────────────────────────────
+    //
+    // Los hubs de /global corren en este mismo proceso: el dossier de la
+    // propiedad se arma en código y arranca YA, en paralelo con la foto del
+    // turno estratégico si también hay que armarla.
+    //   profile   — la pregunta es sólo contexto: perfil turístico (sin tools).
+    //   enriched  — contexto + análisis u operación: turno normal con el dossier.
+    //   strategic — objetivo abierto: el dossier es un insumo más del plan.
+    const tourismPropertyId = session.context.propertyId ?? null;
+    const experience = scope?.experienceLevel ?? "basico";
+    const tourismMode: Exclude<TourismMode, "tool"> | null = !tourismPropertyId
+      ? null
+      : route.strategicRequest
+        ? "strategic"
+        : route.tourism
+          ? route.subAgent.id === "consulta" && attachments.length === 0
+            ? "profile"
+            : "enriched"
+          : null;
+    if (tourismMode === "profile") {
+      stream?.onStep?.({ kind: "tool_start", toolName: TOURISM_STATUS_BLOCK, label: TOURISM_STEP_LABEL });
+    }
+    const tourismPromise: Promise<TourismTurnContext | null> =
+      tourismMode && tourismPropertyId
+        ? prepareTourismContext({
+            propertyId: tourismPropertyId,
+            facets: route.tourism?.facets ?? STRATEGIC_TOURISM_FACETS,
+            mode: tourismMode,
+            message: content,
+            level: experience,
+            budgetMs: tourismMode === "strategic" ? TOURISM_STRATEGIC_BUDGET_MS : TOURISM_PREP_BUDGET_MS,
+          }).catch((err) => {
+            console.warn(
+              "[conversations] no se pudo preparar el estado turístico; sigo sin él:",
+              err instanceof Error ? err.message : err,
+            );
+            return null;
+          })
+        : Promise.resolve(null);
+
     let strategic: Awaited<ReturnType<typeof prepareStrategicTurn>> = null;
     if (route.strategicRequest && session.context.propertyId) {
       try {
@@ -395,12 +593,47 @@ export const conversationsService = {
       }
     }
 
+    const tourism = await tourismPromise;
+    if (tourismMode === "profile") {
+      stream?.onStep?.({
+        kind: "tool_done",
+        toolName: TOURISM_STATUS_BLOCK,
+        label: TOURISM_STEP_LABEL,
+        status: tourism ? "ok" : "error",
+      });
+    }
+    // La tarjeta sale antes de que el modelo empiece: el usuario ve las cifras
+    // mientras se escribe la interpretación.
+    if (tourism?.card) {
+      stream?.onCard?.({ tool: TOURISM_STATUS_BLOCK, result: tourism.card });
+    }
+    const tourismProfileTurn = tourismMode === "profile" && tourism !== null && !strategic;
+    if (tourism) {
+      console.log(
+        `[conversations] estado turístico (${tourism.mode}): ${tourism.meta.prepMs}ms, ` +
+          `tarjeta ${tourism.card ? `${tourism.card.metrics.length} métricas` : "no"}` +
+          (tourism.meta.hubsCold.length ? `, leídos: ${tourism.meta.hubsCold.join(", ")}` : "") +
+          (tourism.meta.failure ? `, falla: ${tourism.meta.failure}` : "") +
+          (tourism.meta.otherPlace ? `, otro lugar: ${tourism.meta.otherPlace}` : ""),
+      );
+    }
+
     // Contenido real para el modelo: adjuntos + texto. Imagen/PDF van inline
     // en base64; CSV/texto se decodifica y va como document de texto plano.
     // Si no hay adjuntos, va el string plano.
     const userBlocks: Array<Record<string, unknown>> = [];
     for (const a of attachments) {
-      if (a.kind === "document" && isTextAttachment(a)) {
+      if (a.kind === "video" || a.kind === "audio") {
+        userBlocks.push({
+          type: "document",
+          source: {
+            type: "text",
+            media_type: "text/plain",
+            data: mediaReports.get(a) ?? "",
+          },
+          title: a.name || a.kind,
+        });
+      } else if (a.kind === "document" && isTextAttachment(a)) {
         userBlocks.push({
           type: "document",
           source: {
@@ -420,6 +653,15 @@ export const conversationsService = {
     if (content.trim()) userBlocks.push({ type: "text", text: content });
     const userContent: unknown = userBlocks.length ? userBlocks : content;
 
+    // Un turno con imagen o PDF necesita un modelo que vea. El tier barato no
+    // ve: OpenRouter contesta 404 "No endpoints found that support image
+    // input" (medido el 13-09-2026) y el turno entero muere. Pasaba con
+    // "hola" + una foto, que el router manda a consulta, el sub-agente barato.
+    let turnModel = strategic?.model ?? (tourismProfileTurn ? tourismModel() : route.subAgent.model);
+    if (needsVision(attachments) && tierOf(turnModel) === "cheap") {
+      turnModel = modelFor("standard");
+    }
+
     // El bloque del plan activo va en TODOS los turnos (el estratégico ya lo
     // incluye en el suyo, con los deltas de KPI calculados contra la foto
     // fresca). Sin esto, "hacé el paso 2" en una charla operativa no tiene a
@@ -427,7 +669,13 @@ export const conversationsService = {
     const planBlock =
       activePlan && !strategic ? renderActivePlanBlock(activePlan) : "";
 
-    const effectiveDynamic = [systemDynamic, planBlock, strategic?.dynamicBlock]
+    const tourismDynamic = tourism?.block
+      ? tourismProfileTurn
+        ? tourism.block
+        : `${tourism.block}\n${TOURISM_ENRICH_NOTE}`
+      : "";
+
+    const effectiveDynamic = [systemDynamic, planBlock, strategic?.dynamicBlock, tourismDynamic]
       .filter((s) => s && s.trim())
       .join("\n\n---\n\n");
     const effectiveStatic = [systemStatic, strategic?.staticBlock]
@@ -444,20 +692,33 @@ export const conversationsService = {
       userMessage: content,
       userContent,
       ragChunksUsed: ragChunksMeta,
-      model: strategic?.model ?? route.subAgent.model,
-      toolIds: strategic?.toolIds ?? route.toolIds,
-      specialization: strategic?.specialization ?? route.subAgent.specialization,
-      webSearch: route.subAgent.webSearch,
-      codeExec: route.subAgent.codeExec,
+      model: turnModel,
+      // El perfil turístico no lleva tools ni web: todo lo que necesita ya está
+      // en el prompt, y sin definiciones de tools el pedido pesa una fracción.
+      toolIds: strategic?.toolIds ?? (tourismProfileTurn ? [] : route.toolIds),
+      specialization:
+        strategic?.specialization ??
+        (tourismProfileTurn && tourism
+          ? tourismSpecialization(tourism, experience)
+          : route.subAgent.specialization),
+      webSearch: tourismProfileTurn ? false : route.subAgent.webSearch,
+      codeExec: tourismProfileTurn ? false : route.subAgent.codeExec,
       // En el turno estratégico las habilidades no se ofrecen: el procedimiento
       // que necesita ya vino en los playbooks, y `load_skill` sólo gastaría una
       // de las tres iteraciones.
-      hasSkills: !strategic && skills.length > 0,
+      hasSkills: !strategic && !tourismProfileTurn && skills.length > 0,
       attachments,
       scope,
-      profile: strategic?.profile,
+      profile: strategic?.profile ?? (tourismProfileTurn ? tourismProfile() : undefined),
       planContext: strategic?.planContext,
       strategicMeta: strategic?.meta,
+      tourismContext: tourism ?? undefined,
+      // Turnos normales con propiedad y usuario verificado: el modelo puede
+      // pedir el estado turístico en vez de buscarlo en la web.
+      tourismTool:
+        scope && tourismPropertyId && !tourism
+          ? { propertyId: tourismPropertyId, level: experience }
+          : undefined,
       onStep: stream?.onStep,
       onDelta: stream?.onDelta,
       onTextEnd: stream?.onTextEnd,
@@ -487,6 +748,7 @@ export const conversationsService = {
         subAgentLabel: route.subAgent.label,
         routedTier: route.subAgent.tier,
         strategic: result.strategic,
+        tourism: result.tourism,
       },
       createdAt: new Date(),
     });
@@ -929,9 +1191,14 @@ async function buildHistoryWindow(sessionId: string) {
   // Mapeamos a formato Anthropic. Solo persistimos texto plano de tools
   // ejecutadas; los tool_use/tool_result detallados del turno previo no
   // se replican (sesion-larga = costo + complejidad sin beneficio claro).
+  // Los videos y audios de mensajes anteriores vuelven como su informe
+  // escrito: sin esto, "¿y qué más se veía?" no tiene de dónde contestar.
   return ordered.map((m) => ({
     role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-    content: m.content,
+    content:
+      m.role === "user" && m.attachmentContext
+        ? `${m.content}\n\n${m.attachmentContext}`
+        : m.content,
   }));
 }
 

@@ -15,13 +15,12 @@
 //      Trae lat/lng del circuito, asi que cae directo en el filtro por radio.
 //   3. Anuales de sede fija por regla (recurring.ts) — maratones Major, Grand
 //      Slams, Dakar, Masters, grandes vueltas.
-//   4. Fixtures de liga ya ingestados por el intelligence-hub, leidos con su
-//      propio helper fetchIntelligence() en vez de volver a pegarle a
+//   4. Fixtures de liga ya ingestados por el intelligence-hub, leidos del feed
+//      de eventos en proceso (eventFeed.ts) en vez de volver a pegarle a
 //      TheSportsDB (que ademas rate-limitea fuerte con la key gratis).
 
 import { fetchJson } from "../intelligence/core/http";
-// El modulo portado ya exporta estas dos con tipos utiles.
-import { fetchIntelligence, isConfigured } from "../global/lib/intelligence";
+import { eventFeedAvailable, getEventFeed } from "../intelligence/eventFeed";
 import { MEGA_EVENTS, PENDING_HOSTS } from "./mega-events";
 import { recurringEvents } from "./recurring";
 import type {
@@ -123,16 +122,15 @@ async function formulaOne(years: number[]): Promise<SportsEvent[]> {
 // ── Fixtures del intelligence-hub ─────────────────────────────────────────
 
 /**
- * Fixtures ya ingestados por el intelligence-hub. Se leen con el MISMO helper
- * que alimenta la capa ih_events del mapa (`fetchIntelligence`), en vez de
- * rearmar la llamada: ese helper ya sabe el path real
- * (`/api/v1/intelligence/summary`, no `/summary`), el header
- * x-internal-secret y la normalizacion de los signals a lat/lng.
+ * Fixtures ya ingestados por el intelligence-hub. Salen del feed de eventos
+ * compartido con cultura y MICE (`eventFeed.ts`): la misma consulta y la misma
+ * forma que la capa ih_events del mapa, pero en proceso y sin traerse el
+ * summary entero por HTTP.
  */
 async function leagueFixtures(): Promise<SportsEvent[]> {
-  if (!isConfigured()) return [];
+  if (!eventFeedAvailable()) return [];
   try {
-    const data = await memo("intel:events", 30 * 60 * 1000, () => fetchIntelligence());
+    const data = await getEventFeed();
     return (data.events ?? [])
       .filter(
         (e: any) =>

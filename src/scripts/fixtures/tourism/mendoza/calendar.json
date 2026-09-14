@@ -1,0 +1,1268 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "countryCode": "AR",
+    "countryName": "Argentina",
+    "region": "Mendoza",
+    "displayName": "Mendoza, Argentina"
+  },
+  "window": {
+    "from": "2026-09-14",
+    "to": "2027-09-14"
+  },
+  "entries": [
+    {
+      "date": "2026-09-21",
+      "endDate": null,
+      "name": "Yom Kippur",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2026-09-26",
+      "endDate": "2026-10-02",
+      "name": "Sukkot",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 6,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2026-10-03",
+      "endDate": null,
+      "name": "Shmini Atzeret",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 6,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2026-10-04",
+      "endDate": null,
+      "name": "Simchat Torah",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2026-10-12",
+      "endDate": null,
+      "name": "Día del Respeto a la Diversidad Cultural",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Nager.Date",
+      "note": "Day of Respect for Cultural Diversity"
+    },
+    {
+      "date": "2026-10-18",
+      "endDate": null,
+      "name": "Día de la Madre",
+      "kind": "observance",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "curado",
+      "curated": true
+    },
+    {
+      "date": "2026-11-23",
+      "endDate": null,
+      "name": "Día de la Soberanía Nacional",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Nager.Date",
+      "note": "National Sovereignty Day"
+    },
+    {
+      "date": "2026-12-04",
+      "endDate": "2026-12-12",
+      "name": "Chanukah",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2026-12-08",
+      "endDate": null,
+      "name": "Día de la Inmaculada Concepción de María",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 2,
+      "source": "Nager.Date",
+      "note": "Immaculate Conception Day"
+    },
+    {
+      "date": "2026-12-18",
+      "endDate": null,
+      "name": "Aguinaldo (2ª cuota)",
+      "kind": "payday",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "curado",
+      "curated": true,
+      "note": "SAC, tope legal de pago"
+    },
+    {
+      "date": "2026-12-25",
+      "endDate": null,
+      "name": "Navidad",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Nager.Date",
+      "note": "Christmas Day"
+    },
+    {
+      "date": "2027-01-01",
+      "endDate": null,
+      "name": "Año Nuevo",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Nager.Date",
+      "note": "New Year's Day"
+    },
+    {
+      "date": "2027-02-08",
+      "endDate": null,
+      "name": "Carnaval",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Nager.Date",
+      "note": "Carnival"
+    },
+    {
+      "date": "2027-02-08",
+      "endDate": "2027-03-08",
+      "name": "Ramadán 1448 AH",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Aladhan",
+      "note": "Mercados emisores musulmanes: baja durante el mes, pico en Eid"
+    },
+    {
+      "date": "2027-02-09",
+      "endDate": null,
+      "name": "Carnaval",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 2,
+      "source": "Nager.Date",
+      "note": "Carnival"
+    },
+    {
+      "date": "2027-02-14",
+      "endDate": null,
+      "name": "San Valentín",
+      "kind": "observance",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "curado",
+      "curated": true
+    },
+    {
+      "date": "2027-03-09",
+      "endDate": null,
+      "name": "Eid al-Fitr",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 2,
+      "source": "Aladhan"
+    },
+    {
+      "date": "2027-03-23",
+      "endDate": null,
+      "name": "Purim",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 2,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2027-03-24",
+      "endDate": null,
+      "name": "Día Nacional de la Memoria por la Verdad y la Justicia",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 3,
+      "source": "Nager.Date",
+      "note": "Day of Remembrance for Truth and Justice"
+    },
+    {
+      "date": "2027-03-26",
+      "endDate": null,
+      "name": "Viernes Santo",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Nager.Date",
+      "note": "Good Friday"
+    },
+    {
+      "date": "2027-04-02",
+      "endDate": null,
+      "name": "Día del Veterano y de los Caídos en la Guerra de Malvinas",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Nager.Date",
+      "note": "Day of the Veterans and Fallen of the Malvinas War"
+    },
+    {
+      "date": "2027-04-22",
+      "endDate": "2027-04-29",
+      "name": "Pesach",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 4,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2027-05-01",
+      "endDate": null,
+      "name": "Día del Trabajador",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 6,
+      "source": "Nager.Date",
+      "note": "Labour Day"
+    },
+    {
+      "date": "2027-05-16",
+      "endDate": null,
+      "name": "Eid al-Adha",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "Aladhan"
+    },
+    {
+      "date": "2027-05-25",
+      "endDate": null,
+      "name": "Día de la Revolución de Mayo",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 2,
+      "source": "Nager.Date",
+      "note": "May Revolution"
+    },
+    {
+      "date": "2027-06-11",
+      "endDate": "2027-06-12",
+      "name": "Shavuot",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2027-06-20",
+      "endDate": null,
+      "name": "Día del Padre",
+      "kind": "observance",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "curado",
+      "curated": true
+    },
+    {
+      "date": "2027-06-20",
+      "endDate": null,
+      "name": "Paso a la Inmortalidad del General Manuel Belgrano",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "Nager.Date",
+      "note": "General Manuel Belgrano Memorial Day"
+    },
+    {
+      "date": "2027-06-21",
+      "endDate": null,
+      "name": "Paso a la Inmortalidad del General Martín Miguel de Güemes",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Nager.Date",
+      "note": "Anniversary of the Passing of General Martín Miguel de Güemes"
+    },
+    {
+      "date": "2027-06-30",
+      "endDate": null,
+      "name": "Aguinaldo (1ª cuota)",
+      "kind": "payday",
+      "nationwide": true,
+      "weekday": 3,
+      "source": "curado",
+      "curated": true,
+      "note": "SAC, tope legal de pago"
+    },
+    {
+      "date": "2027-07-09",
+      "endDate": null,
+      "name": "Día de la Independencia",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 5,
+      "source": "Nager.Date",
+      "note": "Independence Day"
+    },
+    {
+      "date": "2027-08-12",
+      "endDate": null,
+      "name": "Tish’a B’Av",
+      "kind": "religious",
+      "nationwide": true,
+      "weekday": 4,
+      "source": "Hebcal"
+    },
+    {
+      "date": "2027-08-15",
+      "endDate": null,
+      "name": "Día del Niño",
+      "kind": "observance",
+      "nationwide": true,
+      "weekday": 0,
+      "source": "curado",
+      "curated": true
+    },
+    {
+      "date": "2027-08-16",
+      "endDate": null,
+      "name": "Paso a la Inmortalidad del General José de San Martín",
+      "kind": "public",
+      "nationwide": true,
+      "weekday": 1,
+      "source": "Nager.Date",
+      "note": "General José de San Martín Memorial Day"
+    }
+  ],
+  "longWeekends": [
+    {
+      "startDate": "2026-10-10",
+      "endDate": "2026-10-12",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Día del Respeto a la Diversidad Cultural"
+      ]
+    },
+    {
+      "startDate": "2026-11-21",
+      "endDate": "2026-11-23",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Día de la Soberanía Nacional"
+      ]
+    },
+    {
+      "startDate": "2026-12-05",
+      "endDate": "2026-12-08",
+      "dayCount": 4,
+      "needBridgeDay": true,
+      "bridgeDays": [
+        "2026-12-07"
+      ],
+      "holidays": [
+        "Día de la Inmaculada Concepción de María"
+      ]
+    },
+    {
+      "startDate": "2026-12-25",
+      "endDate": "2026-12-27",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Navidad"
+      ]
+    },
+    {
+      "startDate": "2027-01-01",
+      "endDate": "2027-01-03",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Año Nuevo"
+      ]
+    },
+    {
+      "startDate": "2027-02-06",
+      "endDate": "2027-02-09",
+      "dayCount": 4,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Carnaval"
+      ]
+    },
+    {
+      "startDate": "2027-03-24",
+      "endDate": "2027-03-28",
+      "dayCount": 5,
+      "needBridgeDay": true,
+      "bridgeDays": [
+        "2027-03-25"
+      ],
+      "holidays": [
+        "Día Nacional de la Memoria por la Verdad y la Justicia",
+        "Viernes Santo"
+      ]
+    },
+    {
+      "startDate": "2027-04-02",
+      "endDate": "2027-04-04",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Día del Veterano y de los Caídos en la Guerra de Malvinas"
+      ]
+    },
+    {
+      "startDate": "2027-05-22",
+      "endDate": "2027-05-25",
+      "dayCount": 4,
+      "needBridgeDay": true,
+      "bridgeDays": [
+        "2027-05-24"
+      ],
+      "holidays": [
+        "Día de la Revolución de Mayo"
+      ]
+    },
+    {
+      "startDate": "2027-06-19",
+      "endDate": "2027-06-21",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Paso a la Inmortalidad del General Manuel Belgrano",
+        "Paso a la Inmortalidad del General Martín Miguel de Güemes"
+      ]
+    },
+    {
+      "startDate": "2027-07-09",
+      "endDate": "2027-07-11",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Día de la Independencia"
+      ]
+    },
+    {
+      "startDate": "2027-08-14",
+      "endDate": "2027-08-16",
+      "dayCount": 3,
+      "needBridgeDay": false,
+      "bridgeDays": [],
+      "holidays": [
+        "Paso a la Inmortalidad del General José de San Martín"
+      ]
+    }
+  ],
+  "schoolBreaks": [
+    {
+      "startDate": "2026-12-15",
+      "endDate": "2027-02-25",
+      "name": "Vacaciones de verano",
+      "nationwide": true,
+      "subdivisions": [],
+      "season": "summer",
+      "dayCount": 73,
+      "source": "curado",
+      "precision": "approximate",
+      "blockLabel": "Nacional (varía por provincia)",
+      "note": "Cierre del ciclo entre el 11 y el 18/12; inicio entre el 18/2 y el 2/3"
+    },
+    {
+      "startDate": "2027-07-05",
+      "endDate": "2027-07-16",
+      "name": "Vacaciones de invierno",
+      "nationwide": false,
+      "subdivisions": [
+        "Córdoba",
+        "Entre Ríos",
+        "Mendoza",
+        "San Juan",
+        "San Luis",
+        "Santa Fe"
+      ],
+      "season": "winter",
+      "dayCount": 12,
+      "source": "curado",
+      "precision": "verified",
+      "blockLabel": "Bloque 1",
+      "note": "Tres bloques escalonados; cada jurisdicción elige el suyo"
+    },
+    {
+      "startDate": "2027-07-12",
+      "endDate": "2027-07-23",
+      "name": "Vacaciones de invierno",
+      "nationwide": false,
+      "subdivisions": [
+        "Salta",
+        "Tucumán",
+        "Misiones",
+        "Corrientes",
+        "Neuquén",
+        "Río Negro",
+        "y otras"
+      ],
+      "season": "winter",
+      "dayCount": 12,
+      "source": "curado",
+      "precision": "verified",
+      "blockLabel": "Bloque 2 (mayoría de provincias)",
+      "note": "Tres bloques escalonados; cada jurisdicción elige el suyo"
+    },
+    {
+      "startDate": "2027-07-19",
+      "endDate": "2027-07-30",
+      "name": "Vacaciones de invierno",
+      "nationwide": false,
+      "subdivisions": [
+        "Buenos Aires",
+        "CABA",
+        "Chaco",
+        "Santiago del Estero"
+      ],
+      "season": "winter",
+      "dayCount": 12,
+      "source": "curado",
+      "precision": "verified",
+      "blockLabel": "Bloque 3",
+      "note": "Tres bloques escalonados; cada jurisdicción elige el suyo"
+    }
+  ],
+  "emitters": [
+    {
+      "countryCode": "BR",
+      "countryName": "BR",
+      "longWeekends": [
+        {
+          "startDate": "2026-10-10",
+          "endDate": "2026-10-12",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Nossa Senhora Aparecida"
+          ]
+        },
+        {
+          "startDate": "2026-10-31",
+          "endDate": "2026-11-02",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Dia de Finados"
+          ]
+        },
+        {
+          "startDate": "2026-11-20",
+          "endDate": "2026-11-22",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Dia da Consciência Negra"
+          ]
+        },
+        {
+          "startDate": "2026-12-25",
+          "endDate": "2026-12-27",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Natal"
+          ]
+        },
+        {
+          "startDate": "2027-01-01",
+          "endDate": "2027-01-03",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Confraternização Universal"
+          ]
+        },
+        {
+          "startDate": "2027-03-26",
+          "endDate": "2027-03-28",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Sexta-feira Santa",
+            "Domingo de Páscoa"
+          ]
+        },
+        {
+          "startDate": "2027-05-27",
+          "endDate": "2027-05-30",
+          "dayCount": 4,
+          "needBridgeDay": true,
+          "bridgeDays": [
+            "2027-05-28"
+          ],
+          "holidays": [
+            "Corpus Christi"
+          ]
+        },
+        {
+          "startDate": "2027-09-04",
+          "endDate": "2027-09-07",
+          "dayCount": 4,
+          "needBridgeDay": true,
+          "bridgeDays": [
+            "2027-09-06"
+          ],
+          "holidays": [
+            "Dia da Independência"
+          ]
+        }
+      ],
+      "schoolBreaks": [
+        {
+          "startDate": "2026-12-20",
+          "endDate": "2027-02-03",
+          "name": "Férias de verão",
+          "nationwide": true,
+          "subdivisions": [],
+          "season": "summer",
+          "dayCount": 46,
+          "source": "curado",
+          "precision": "approximate",
+          "blockLabel": "Nacional (varía por estado)",
+          "note": "Vuelta a clases alrededor del 4/2 en SP y MG"
+        },
+        {
+          "startDate": "2027-07-05",
+          "endDate": "2027-07-16",
+          "name": "Férias de julho",
+          "nationwide": false,
+          "subdivisions": [
+            "São Paulo"
+          ],
+          "season": "winter",
+          "dayCount": 12,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "São Paulo",
+          "note": "Cada estado define el suyo; las privadas pueden diferir"
+        },
+        {
+          "startDate": "2027-07-19",
+          "endDate": "2027-07-30",
+          "name": "Férias de julho",
+          "nationwide": false,
+          "subdivisions": [
+            "Pernambuco"
+          ],
+          "season": "winter",
+          "dayCount": 12,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Pernambuco y similares",
+          "note": "Cada estado define el suyo; las privadas pueden diferir"
+        },
+        {
+          "startDate": "2027-07-19",
+          "endDate": "2027-07-30",
+          "name": "Férias de julho",
+          "nationwide": false,
+          "subdivisions": [
+            "Minas Gerais"
+          ],
+          "season": "winter",
+          "dayCount": 12,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Minas Gerais",
+          "note": "Cada estado define el suyo; las privadas pueden diferir"
+        }
+      ]
+    },
+    {
+      "countryCode": "CL",
+      "countryName": "CL",
+      "longWeekends": [
+        {
+          "startDate": "2026-09-18",
+          "endDate": "2026-09-20",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Fiestas Patrias",
+            "Día de las Glorias del Ejército"
+          ]
+        },
+        {
+          "startDate": "2026-10-10",
+          "endDate": "2026-10-12",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Día del Descubrimiento de Dos Mundos"
+          ]
+        },
+        {
+          "startDate": "2026-12-05",
+          "endDate": "2026-12-08",
+          "dayCount": 4,
+          "needBridgeDay": true,
+          "bridgeDays": [
+            "2026-12-07"
+          ],
+          "holidays": [
+            "Inmaculada Concepción"
+          ]
+        },
+        {
+          "startDate": "2026-12-25",
+          "endDate": "2026-12-27",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Navidad / Natividad del Señor"
+          ]
+        },
+        {
+          "startDate": "2027-01-01",
+          "endDate": "2027-01-03",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Año Nuevo"
+          ]
+        },
+        {
+          "startDate": "2027-03-26",
+          "endDate": "2027-03-28",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Viernes Santo",
+            "Sábado Santo"
+          ]
+        },
+        {
+          "startDate": "2027-05-21",
+          "endDate": "2027-05-23",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Día de las Glorias Navales"
+          ]
+        },
+        {
+          "startDate": "2027-06-19",
+          "endDate": "2027-06-21",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Día Nacional de los Pueblos Indígenas"
+          ]
+        },
+        {
+          "startDate": "2027-06-26",
+          "endDate": "2027-06-28",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "San Pedro y San Pablo"
+          ]
+        },
+        {
+          "startDate": "2027-07-16",
+          "endDate": "2027-07-18",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Virgen del Carmen"
+          ]
+        }
+      ],
+      "schoolBreaks": [
+        {
+          "startDate": "2026-12-05",
+          "endDate": "2027-03-03",
+          "name": "Vacaciones de verano",
+          "nationwide": true,
+          "subdivisions": [],
+          "season": "summer",
+          "dayCount": 89,
+          "source": "curado",
+          "precision": "approximate",
+          "blockLabel": "Nacional",
+          "note": "Cierre a fines de noviembre/principios de diciembre; ingreso de estudiantes el 4/3"
+        },
+        {
+          "startDate": "2027-06-28",
+          "endDate": "2027-07-09",
+          "name": "Vacaciones de invierno",
+          "nationwide": false,
+          "subdivisions": [
+            "Metropolitana",
+            "Valparaíso",
+            "Maule",
+            "Biobío",
+            "Araucanía",
+            "Los Ríos",
+            "Atacama",
+            "Coquimbo"
+          ],
+          "season": "winter",
+          "dayCount": 12,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Atacama a Los Ríos (incl. Metropolitana)",
+          "note": "Mineduc escalona por región; Aysén y Magallanes tienen 3 semanas"
+        },
+        {
+          "startDate": "2027-06-28",
+          "endDate": "2027-07-16",
+          "name": "Vacaciones de invierno",
+          "nationwide": false,
+          "subdivisions": [
+            "Aysén",
+            "Magallanes"
+          ],
+          "season": "winter",
+          "dayCount": 19,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Aysén y Magallanes (3 semanas)",
+          "note": "Mineduc escalona por región; Aysén y Magallanes tienen 3 semanas"
+        },
+        {
+          "startDate": "2027-07-05",
+          "endDate": "2027-07-16",
+          "name": "Vacaciones de invierno",
+          "nationwide": false,
+          "subdivisions": [
+            "Antofagasta",
+            "Los Lagos"
+          ],
+          "season": "winter",
+          "dayCount": 12,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Antofagasta y Los Lagos",
+          "note": "Mineduc escalona por región; Aysén y Magallanes tienen 3 semanas"
+        },
+        {
+          "startDate": "2027-07-12",
+          "endDate": "2027-07-23",
+          "name": "Vacaciones de invierno",
+          "nationwide": false,
+          "subdivisions": [
+            "Arica y Parinacota",
+            "Tarapacá"
+          ],
+          "season": "winter",
+          "dayCount": 12,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Arica y Parinacota, Tarapacá",
+          "note": "Mineduc escalona por región; Aysén y Magallanes tienen 3 semanas"
+        }
+      ]
+    },
+    {
+      "countryCode": "ES",
+      "countryName": "ES",
+      "longWeekends": [
+        {
+          "startDate": "2026-10-10",
+          "endDate": "2026-10-12",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Fiesta Nacional de España"
+          ]
+        },
+        {
+          "startDate": "2026-12-05",
+          "endDate": "2026-12-08",
+          "dayCount": 4,
+          "needBridgeDay": true,
+          "bridgeDays": [
+            "2026-12-07"
+          ],
+          "holidays": [
+            "Día de la Constitución",
+            "Inmaculada Concepción"
+          ]
+        },
+        {
+          "startDate": "2026-12-25",
+          "endDate": "2026-12-27",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Navidad",
+            "Feast of Saint Stephen"
+          ]
+        },
+        {
+          "startDate": "2027-01-01",
+          "endDate": "2027-01-03",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Año Nuevo"
+          ]
+        },
+        {
+          "startDate": "2027-03-26",
+          "endDate": "2027-03-28",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Viernes Santo"
+          ]
+        }
+      ],
+      "schoolBreaks": []
+    },
+    {
+      "countryCode": "US",
+      "countryName": "US",
+      "longWeekends": [
+        {
+          "startDate": "2026-11-26",
+          "endDate": "2026-11-29",
+          "dayCount": 4,
+          "needBridgeDay": true,
+          "bridgeDays": [
+            "2026-11-27"
+          ],
+          "holidays": [
+            "Thanksgiving Day"
+          ]
+        },
+        {
+          "startDate": "2026-12-25",
+          "endDate": "2026-12-27",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Christmas Day"
+          ]
+        },
+        {
+          "startDate": "2027-01-01",
+          "endDate": "2027-01-03",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "New Year's Day"
+          ]
+        },
+        {
+          "startDate": "2027-01-16",
+          "endDate": "2027-01-18",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Martin Luther King, Jr. Day"
+          ]
+        },
+        {
+          "startDate": "2027-02-13",
+          "endDate": "2027-02-15",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Washington's Birthday"
+          ]
+        },
+        {
+          "startDate": "2027-05-29",
+          "endDate": "2027-05-31",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Memorial Day"
+          ]
+        },
+        {
+          "startDate": "2027-06-18",
+          "endDate": "2027-06-20",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Juneteenth National Independence Day"
+          ]
+        },
+        {
+          "startDate": "2027-07-03",
+          "endDate": "2027-07-05",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Independence Day"
+          ]
+        },
+        {
+          "startDate": "2027-09-04",
+          "endDate": "2027-09-06",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Labor Day"
+          ]
+        }
+      ],
+      "schoolBreaks": []
+    },
+    {
+      "countryCode": "UY",
+      "countryName": "UY",
+      "longWeekends": [
+        {
+          "startDate": "2026-10-10",
+          "endDate": "2026-10-12",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Día de la Raza"
+          ]
+        },
+        {
+          "startDate": "2026-10-31",
+          "endDate": "2026-11-02",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Día de los Difuntos"
+          ]
+        },
+        {
+          "startDate": "2026-12-25",
+          "endDate": "2026-12-27",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Día de la Familia"
+          ]
+        },
+        {
+          "startDate": "2027-01-01",
+          "endDate": "2027-01-03",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Año Nuevo"
+          ]
+        },
+        {
+          "startDate": "2027-02-06",
+          "endDate": "2027-02-09",
+          "dayCount": 4,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Carnaval"
+          ]
+        },
+        {
+          "startDate": "2027-03-25",
+          "endDate": "2027-03-28",
+          "dayCount": 4,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Semana de Turismo"
+          ]
+        },
+        {
+          "startDate": "2027-04-17",
+          "endDate": "2027-04-19",
+          "dayCount": 3,
+          "needBridgeDay": false,
+          "bridgeDays": [],
+          "holidays": [
+            "Desembarco de los 33 Orientales"
+          ]
+        },
+        {
+          "startDate": "2027-05-15",
+          "endDate": "2027-05-18",
+          "dayCount": 4,
+          "needBridgeDay": true,
+          "bridgeDays": [
+            "2027-05-17"
+          ],
+          "holidays": [
+            "Batalla de las Piedras"
+          ]
+        }
+      ],
+      "schoolBreaks": [
+        {
+          "startDate": "2026-09-21",
+          "endDate": "2026-09-25",
+          "name": "Vacaciones de primavera",
+          "nationwide": true,
+          "subdivisions": [],
+          "season": "spring",
+          "dayCount": 5,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Nacional",
+          "note": "ANEP la amplió a una semana completa en 2026"
+        },
+        {
+          "startDate": "2026-12-18",
+          "endDate": "2027-03-01",
+          "name": "Vacaciones de verano",
+          "nationwide": true,
+          "subdivisions": [],
+          "season": "summer",
+          "dayCount": 74,
+          "source": "curado",
+          "precision": "approximate",
+          "blockLabel": "Nacional",
+          "note": "Cierre de inicial y primaria el 18/12; inicio de clases el 2/3"
+        },
+        {
+          "startDate": "2027-06-28",
+          "endDate": "2027-07-02",
+          "name": "Vacaciones de invierno",
+          "nationwide": true,
+          "subdivisions": [],
+          "season": "winter",
+          "dayCount": 5,
+          "source": "curado",
+          "precision": "verified",
+          "blockLabel": "Nacional",
+          "note": "ANEP: una sola semana, más corta que la de Argentina"
+        }
+      ]
+    }
+  ],
+  "moveable": {
+    "ramadan": {
+      "start": "2027-02-08",
+      "end": "2027-03-08",
+      "hijriYear": 1448
+    },
+    "eidAlFitr": "2027-03-09",
+    "eidAlAdha": "2027-05-16",
+    "jewish": [
+      {
+        "name": "Yom Kippur",
+        "date": "2026-09-21",
+        "endDate": "2026-09-21"
+      },
+      {
+        "name": "Sukkot",
+        "date": "2026-09-26",
+        "endDate": "2026-10-02"
+      },
+      {
+        "name": "Shmini Atzeret",
+        "date": "2026-10-03",
+        "endDate": "2026-10-03"
+      },
+      {
+        "name": "Simchat Torah",
+        "date": "2026-10-04",
+        "endDate": "2026-10-04"
+      },
+      {
+        "name": "Chanukah",
+        "date": "2026-12-04",
+        "endDate": "2026-12-12"
+      },
+      {
+        "name": "Purim",
+        "date": "2027-03-23",
+        "endDate": "2027-03-23"
+      },
+      {
+        "name": "Pesach",
+        "date": "2027-04-22",
+        "endDate": "2027-04-29"
+      },
+      {
+        "name": "Shavuot",
+        "date": "2027-06-11",
+        "endDate": "2027-06-12"
+      },
+      {
+        "name": "Tish’a B’Av",
+        "date": "2027-08-12",
+        "endDate": "2027-08-12"
+      }
+    ],
+    "easter": {
+      "date": "2027-03-28",
+      "goodFriday": "2027-03-26",
+      "ascension": "2027-05-06",
+      "pentecost": "2027-05-16"
+    }
+  },
+  "coverage": {
+    "publicHolidays": true,
+    "longWeekends": true,
+    "schoolHolidays": true,
+    "observances": true,
+    "paydays": true,
+    "gaps": [
+      "Calendario escolar de AR por tabla curada (OpenHolidays no lo cubre); 1 ventana(s) de verano son estimadas"
+    ]
+  },
+  "sources": [
+    "Nager.Date (feriados + fines de semana largos)",
+    "OpenHolidays (recesos escolares)",
+    "Aladhan (calendario hijri)",
+    "Hebcal (calendario hebreo)",
+    "Tabla curada (efemérides, aguinaldos y calendario escolar del Cono Sur)"
+  ],
+  "timestamp": "2026-09-14T05:00:10.212Z"
+}

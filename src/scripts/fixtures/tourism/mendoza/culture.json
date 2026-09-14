@@ -1,0 +1,69 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "radiusKm": 100
+  },
+  "window": {
+    "from": "2026-09-14",
+    "to": "2027-09-09"
+  },
+  "anchors": [
+    {
+      "id": "anchor-vendimia-2027-03-06",
+      "name": "Fiesta Nacional de la Vendimia",
+      "category": "food",
+      "origin": "anchor",
+      "startDate": "2027-03-06",
+      "endDate": "2027-03-09",
+      "city": "Mendoza",
+      "country": "Argentina",
+      "venue": null,
+      "lat": -32.8895,
+      "lng": -68.8458,
+      "distanceKm": 0,
+      "leadDays": 173,
+      "impact": 0.95,
+      "source": "Tabla curada",
+      "note": "Primer fin de semana de marzo; agota Mendoza y alrededores"
+    }
+  ],
+  "listings": [],
+  "byCategory": {
+    "food": 1
+  },
+  "headline": {
+    "id": "anchor-vendimia-2027-03-06",
+    "name": "Fiesta Nacional de la Vendimia",
+    "category": "food",
+    "origin": "anchor",
+    "startDate": "2027-03-06",
+    "endDate": "2027-03-09",
+    "city": "Mendoza",
+    "country": "Argentina",
+    "venue": null,
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "distanceKm": 0,
+    "leadDays": 173,
+    "impact": 0.95,
+    "source": "Tabla curada",
+    "note": "Primer fin de semana de marzo; agota Mendoza y alrededores"
+  },
+  "listingsTotal": 0,
+  "coverage": {
+    "anchors": true,
+    "listings": false,
+    "lunarFeasts": true,
+    "gaps": [
+      "El intelligence-hub no tiene eventos culturales en este radio",
+      "Las anclas curadas cubren los festivales globales; las fiestas patronales locales solo aparecen si algun scraper del hub las publica"
+    ]
+  },
+  "sources": [
+    "Tabla curada (festivales ancla)",
+    "Intelligence Hub (Ticketmaster, Eventbrite, scrapers)",
+    "Nager.Date (fiestas lunares)"
+  ],
+  "timestamp": "2026-09-14T05:00:06.668Z"
+}

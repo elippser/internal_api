@@ -1,0 +1,441 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458
+  },
+  "article": {
+    "title": "Ciudad_de_Mendoza",
+    "place": "Ciudad de Mendoza",
+    "resolvedVia": "nominatim",
+    "url": "https://es.wikipedia.org/wiki/Ciudad_de_Mendoza"
+  },
+  "window": {
+    "days": 180
+  },
+  "totalViews": 3074,
+  "byLanguage": [
+    {
+      "code": "es",
+      "label": "Espaniol",
+      "title": "Ciudad_de_Mendoza",
+      "totalViews": 3074,
+      "dailyMean": 17,
+      "share": 1,
+      "spike": null
+    }
+  ],
+  "spike": null,
+  "series": [
+    {
+      "date": "20260616",
+      "views": 16
+    },
+    {
+      "date": "20260617",
+      "views": 16
+    },
+    {
+      "date": "20260618",
+      "views": 19
+    },
+    {
+      "date": "20260619",
+      "views": 17
+    },
+    {
+      "date": "20260620",
+      "views": 12
+    },
+    {
+      "date": "20260621",
+      "views": 11
+    },
+    {
+      "date": "20260622",
+      "views": 14
+    },
+    {
+      "date": "20260623",
+      "views": 12
+    },
+    {
+      "date": "20260624",
+      "views": 18
+    },
+    {
+      "date": "20260625",
+      "views": 26
+    },
+    {
+      "date": "20260626",
+      "views": 19
+    },
+    {
+      "date": "20260627",
+      "views": 13
+    },
+    {
+      "date": "20260628",
+      "views": 12
+    },
+    {
+      "date": "20260629",
+      "views": 20
+    },
+    {
+      "date": "20260630",
+      "views": 13
+    },
+    {
+      "date": "20260701",
+      "views": 16
+    },
+    {
+      "date": "20260702",
+      "views": 15
+    },
+    {
+      "date": "20260703",
+      "views": 12
+    },
+    {
+      "date": "20260704",
+      "views": 16
+    },
+    {
+      "date": "20260705",
+      "views": 11
+    },
+    {
+      "date": "20260706",
+      "views": 19
+    },
+    {
+      "date": "20260707",
+      "views": 14
+    },
+    {
+      "date": "20260708",
+      "views": 11
+    },
+    {
+      "date": "20260709",
+      "views": 23
+    },
+    {
+      "date": "20260710",
+      "views": 24
+    },
+    {
+      "date": "20260711",
+      "views": 30
+    },
+    {
+      "date": "20260712",
+      "views": 38
+    },
+    {
+      "date": "20260713",
+      "views": 43
+    },
+    {
+      "date": "20260714",
+      "views": 36
+    },
+    {
+      "date": "20260715",
+      "views": 18
+    },
+    {
+      "date": "20260716",
+      "views": 18
+    },
+    {
+      "date": "20260717",
+      "views": 20
+    },
+    {
+      "date": "20260718",
+      "views": 10
+    },
+    {
+      "date": "20260719",
+      "views": 16
+    },
+    {
+      "date": "20260720",
+      "views": 21
+    },
+    {
+      "date": "20260721",
+      "views": 20
+    },
+    {
+      "date": "20260722",
+      "views": 17
+    },
+    {
+      "date": "20260723",
+      "views": 14
+    },
+    {
+      "date": "20260724",
+      "views": 20
+    },
+    {
+      "date": "20260725",
+      "views": 22
+    },
+    {
+      "date": "20260726",
+      "views": 18
+    },
+    {
+      "date": "20260727",
+      "views": 14
+    },
+    {
+      "date": "20260728",
+      "views": 19
+    },
+    {
+      "date": "20260729",
+      "views": 23
+    },
+    {
+      "date": "20260730",
+      "views": 17
+    },
+    {
+      "date": "20260731",
+      "views": 19
+    },
+    {
+      "date": "20260801",
+      "views": 12
+    },
+    {
+      "date": "20260802",
+      "views": 21
+    },
+    {
+      "date": "20260803",
+      "views": 19
+    },
+    {
+      "date": "20260804",
+      "views": 14
+    },
+    {
+      "date": "20260805",
+      "views": 15
+    },
+    {
+      "date": "20260806",
+      "views": 19
+    },
+    {
+      "date": "20260807",
+      "views": 16
+    },
+    {
+      "date": "20260808",
+      "views": 19
+    },
+    {
+      "date": "20260809",
+      "views": 11
+    },
+    {
+      "date": "20260810",
+      "views": 10
+    },
+    {
+      "date": "20260811",
+      "views": 22
+    },
+    {
+      "date": "20260812",
+      "views": 22
+    },
+    {
+      "date": "20260813",
+      "views": 15
+    },
+    {
+      "date": "20260814",
+      "views": 19
+    },
+    {
+      "date": "20260815",
+      "views": 16
+    },
+    {
+      "date": "20260816",
+      "views": 15
+    },
+    {
+      "date": "20260817",
+      "views": 14
+    },
+    {
+      "date": "20260818",
+      "views": 17
+    },
+    {
+      "date": "20260819",
+      "views": 19
+    },
+    {
+      "date": "20260820",
+      "views": 20
+    },
+    {
+      "date": "20260821",
+      "views": 8
+    },
+    {
+      "date": "20260822",
+      "views": 16
+    },
+    {
+      "date": "20260823",
+      "views": 20
+    },
+    {
+      "date": "20260824",
+      "views": 15
+    },
+    {
+      "date": "20260825",
+      "views": 16
+    },
+    {
+      "date": "20260826",
+      "views": 11
+    },
+    {
+      "date": "20260827",
+      "views": 13
+    },
+    {
+      "date": "20260828",
+      "views": 5
+    },
+    {
+      "date": "20260829",
+      "views": 12
+    },
+    {
+      "date": "20260830",
+      "views": 13
+    },
+    {
+      "date": "20260831",
+      "views": 17
+    },
+    {
+      "date": "20260901",
+      "views": 19
+    },
+    {
+      "date": "20260902",
+      "views": 9
+    },
+    {
+      "date": "20260903",
+      "views": 12
+    },
+    {
+      "date": "20260904",
+      "views": 12
+    },
+    {
+      "date": "20260905",
+      "views": 21
+    },
+    {
+      "date": "20260906",
+      "views": 13
+    },
+    {
+      "date": "20260907",
+      "views": 17
+    },
+    {
+      "date": "20260908",
+      "views": 16
+    },
+    {
+      "date": "20260909",
+      "views": 3
+    },
+    {
+      "date": "20260910",
+      "views": 14
+    },
+    {
+      "date": "20260911",
+      "views": 8
+    },
+    {
+      "date": "20260912",
+      "views": 9
+    },
+    {
+      "date": "20260913",
+      "views": 17
+    }
+  ],
+  "nearby": [
+    {
+      "title": "Colegio Nacional Agustín Álvarez",
+      "distanceM": 77
+    },
+    {
+      "title": "Plaza Independencia (Mendoza)",
+      "distanceM": 96
+    },
+    {
+      "title": "Teatro Independencia",
+      "distanceM": 111
+    },
+    {
+      "title": "Gran Mendoza",
+      "distanceM": 129
+    },
+    {
+      "title": "Mendoza (Argentina)",
+      "distanceM": 129
+    },
+    {
+      "title": "Catedral de Nuestra Señora de Loreto (Mendoza)",
+      "distanceM": 242
+    },
+    {
+      "title": "Plaza Chile (Mendoza)",
+      "distanceM": 381
+    },
+    {
+      "title": "Metrotranvía de Mendoza",
+      "distanceM": 419
+    }
+  ],
+  "coverage": {
+    "article": true,
+    "languages": 1,
+    "gaps": [
+      "Las ediciones de Wikipedia tienen trafico base muy distinto (la inglesa recibe un orden de magnitud mas): las proporciones comparan VOLUMEN, no cuantos viajeros hay detras. Lo comparable es la misma edicion entre destinos, o su pico contra su propia base",
+      "Redes sociales e influencers: sin API abierta; lo viral solo se ve reflejado en la atencion",
+      "Reseñas y calificacion online: son dato del PMS y de cada OTA, no de un punto del mapa",
+      "Google Trends no tiene API publica: Wikipedia es el sustituto disponible",
+      "Workation, turismo sostenible, revenge travel: son marcos de lectura del mercado, no un dato geolocalizable"
+    ]
+  },
+  "sources": [
+    "Wikimedia Pageviews API",
+    "Wikipedia geosearch",
+    "OpenStreetMap Nominatim"
+  ],
+  "timestamp": "2026-09-14T05:00:08.939Z"
+}

@@ -38,11 +38,15 @@ export interface EventDefinition {
 }
 
 const PMS: EventSource[] = ["pms-core"];
-/** Los tres fronts que embeben el motor de reservas. */
+/**
+ * Los fronts que embeben el motor de reservas. `linkhub-renderer` corre el
+ * mismo motor del web-renderer (espejo) abierto desde el bloque de reservas.
+ */
 const ENGINE_FRONTS: EventSource[] = [
   "web-engine-public",
   "web-renderer",
   "staypass",
+  "linkhub-renderer",
 ];
 
 /** Emitido server-side por un api, no por un browser. */

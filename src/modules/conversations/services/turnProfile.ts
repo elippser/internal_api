@@ -19,7 +19,7 @@
 
 import type { AnthropicTool } from "./toolExecutor";
 
-export type TurnProfileId = "default" | "estrategico" | "paso_de_plan";
+export type TurnProfileId = "default" | "estrategico" | "paso_de_plan" | "turistico";
 
 /**
  * `tool_choice` del pedido. Se elige POR ITERACIÓN porque lo que el turno

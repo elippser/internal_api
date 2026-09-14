@@ -25,7 +25,7 @@
 // normalizar, filtrar por categoria no sirve para nada.
 
 import { fetchJson } from "../intelligence/core/http";
-import { fetchIntelligence, isConfigured } from "../global/lib/intelligence";
+import { eventFeedAvailable, getEventFeed } from "../intelligence/eventFeed";
 import { festivalsFor, type CultureCategory } from "./festivals";
 import type {
   CultureCoverage,
@@ -168,9 +168,10 @@ const LUNAR_ANCHORS: Record<"cny" | "diwali", Array<{ city: string; country: str
 // ── Cola larga del intelligence-hub ───────────────────────────────────────
 
 async function listings(): Promise<CultureEvent[]> {
-  if (!isConfigured()) return [];
+  if (!eventFeedAvailable()) return [];
   try {
-    const data = await memo("intel:events", 30 * 60 * 1000, () => fetchIntelligence());
+    // Feed compartido con deportes y MICE, leído en proceso (ver eventFeed.ts).
+    const data = await getEventFeed();
     return (data.events ?? [])
       .filter(
         (e: any) =>
@@ -334,7 +335,7 @@ export async function getCulturePoint(
       : (shown[0] ?? null);
 
   const gaps: string[] = [];
-  if (!isConfigured()) {
+  if (!eventFeedAvailable()) {
     gaps.push("Sin cola larga: el intelligence-hub no esta configurado");
   } else if (listingsTotal === 0) {
     gaps.push("El intelligence-hub no tiene eventos culturales en este radio");

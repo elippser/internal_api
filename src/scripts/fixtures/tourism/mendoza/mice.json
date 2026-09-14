@@ -1,0 +1,32 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "radiusKm": 100
+  },
+  "window": {
+    "from": "2026-09-14",
+    "to": "2027-09-09"
+  },
+  "anchors": [],
+  "listings": [],
+  "listingsTotal": 0,
+  "byCategory": {},
+  "headline": null,
+  "delegateNights": 0,
+  "coverage": {
+    "anchors": false,
+    "listings": false,
+    "gaps": [
+      "Cumbre del G20 2027: sede sin confirmar",
+      "Congresos medicos de sede rotativa (ESMO, ASCO, ESC): la sede se anuncia con ~1 anio y no hay API",
+      "Lanzamientos corporativos, asambleas de accionistas y viajes de incentivo: no se publican en ningun calendario abierto",
+      "El intelligence-hub no tiene eventos corporativos en este radio"
+    ]
+  },
+  "sources": [
+    "Tabla curada (ferias, foros y cumbres ancla)",
+    "Intelligence Hub (recintos de convenciones, Eventbrite, Meetup)"
+  ],
+  "timestamp": "2026-09-14T05:00:06.554Z"
+}

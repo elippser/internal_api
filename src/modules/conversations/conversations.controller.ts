@@ -108,6 +108,7 @@ export const conversationsController = {
           onStep: (step) => send("step", step),
           onDelta: (text) => send("delta", { text }),
           onTextEnd: () => send("text_end", {}),
+          onCard: (block) => send("card", block),
         },
       );
       send("message", result);

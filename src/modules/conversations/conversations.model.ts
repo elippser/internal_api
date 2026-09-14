@@ -213,6 +213,28 @@ const agentMetaSchema = new Schema(
       ),
       default: null,
     },
+    /**
+     * Telemetría del estado turístico. `hubsCold` siempre lleno significa que
+     * el dossier no está persistiendo (o la función muere antes de la escritura
+     * tardía); `missing` repetido en un hub señala una fuente caída.
+     */
+    tourism: {
+      type: new Schema(
+        {
+          mode: { type: String, default: "" },
+          facets: { type: [String], default: [] },
+          prepMs: { type: Number, default: 0 },
+          missing: { type: [String], default: [] },
+          hubsCold: { type: [String], default: [] },
+          locationSource: { type: String, default: "" },
+          cardShown: { type: Boolean, default: false },
+          otherPlace: { type: String, default: null },
+          failure: { type: String, default: null },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
   },
   { _id: false },
 );
@@ -234,6 +256,11 @@ const messageSchema = new Schema(
     agentId: { type: String, required: true },
     role: { type: String, enum: MESSAGE_ROLES, required: true },
     content: { type: String, default: "" },
+    // Sólo mensajes del usuario: el informe escrito de los videos y audios que
+    // adjuntó (los bytes no se guardan). Entra al historial de los turnos
+    // siguientes para que "¿y qué más se ve?" tenga de dónde contestar; la UI
+    // no lo muestra — el globo sigue siendo `content`.
+    attachmentContext: { type: String, default: "" },
     agentMeta: { type: agentMetaSchema, default: null },
     // Retroalimentacion explicita del usuario sobre la respuesta del agente.
     feedback: { type: feedbackSchema, default: null },

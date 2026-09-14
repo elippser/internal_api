@@ -15,8 +15,8 @@
  *   pistacho #c8e293 · gris #63665a · linea #ddd8ca
  * La regla de la marca es que el color aparece en UNA palabra, UN punto o UN
  * boton — nunca como bloque de fondo, salvo las bandas de tinta. Por eso la
- * cabecera es tinta, el boton es tinta y lo unico verde es el punto del
- * logotipo, el del eyebrow y los numeros de los pasos.
+ * cabecera es tinta, el boton es tinta y lo unico verde es el circulo del
+ * isotipo, el punto del eyebrow y los numeros de los pasos.
  */
 
 import type { Locale } from "./leads.i18n";
@@ -80,15 +80,33 @@ function formatDate(date: Date, locale: Locale): string {
 // ---------------------------------------------------------------------------
 
 /**
- * El logotipo, en texto.
+ * El logotipo, sin imagenes.
  *
  * No va como imagen a proposito: Gmail y Outlook bloquean las imagenes remotas
  * por defecto, y la cabecera del correo que ES la puerta de entrada no puede
- * depender de que alguien apriete "mostrar imagenes". El punto es la marca
- * (§13), asi que se pinta en pistacho sobre la banda de tinta.
+ * depender de que alguien apriete "mostrar imagenes".
+ *
+ * El isotipo se arma con cuatro celdas de tabla y border-radius: cupula, hoja
+ * (la curva arriba a la izquierda), cuadrado y el circulo, que es lo unico en
+ * pistacho sobre la banda de tinta (§13). Mide lo que el alto de la palabra,
+ * con la separacion de la version reducida. Outlook de escritorio ignora
+ * border-radius y lo muestra como cuatro cuadrados: se degrada, no se rompe.
  */
 function wordmark(): string {
-  return `<span style="font-size:20px;font-weight:600;letter-spacing:-0.02em;color:${C.paper};">roombir<span style="color:${C.bright};">.</span></span>`;
+  const cell = (radius: string, color: string) =>
+    `<td width="9" height="9" style="width:9px;height:9px;padding:0;font-size:0;line-height:0;background:${color};border-radius:${radius};">&nbsp;</td>`;
+  const gapX = `<td width="2" style="width:2px;padding:0;font-size:0;line-height:0;">&nbsp;</td>`;
+  const gapY = `<tr><td colspan="3" height="2" style="height:2px;padding:0;font-size:0;line-height:0;">&nbsp;</td></tr>`;
+  const isotype =
+    `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;">` +
+    `<tr>${cell("5px 5px 2px 2px", C.paper)}${gapX}${cell("7px 2px 2px 2px", C.paper)}</tr>` +
+    gapY +
+    `<tr>${cell("2px", C.paper)}${gapX}${cell("50%", C.bright)}</tr>` +
+    `</table>`;
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+<td valign="middle" style="padding:0 10px 0 0;">${isotype}</td>
+<td valign="middle" style="font-family:${FONT};font-size:20px;font-weight:600;letter-spacing:-0.02em;line-height:1;color:${C.paper};">roombir</td>
+</tr></table>`;
 }
 
 /** Boton a prueba de Outlook: VML para MSO, ancla con padding para el resto. */

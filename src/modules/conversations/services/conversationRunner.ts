@@ -31,6 +31,18 @@ import {
   runProposeGrowthPlan,
   type PlanToolContext,
 } from "../../growth/plan/planTool";
+import {
+  CONSULTAR_ESTADO_TURISTICO,
+  CONSULTAR_ESTADO_TURISTICO_TOOL,
+  runTourismTool,
+  type TourismToolContext,
+} from "../../tourism/tourismTool";
+import {
+  TOURISM_STATUS_BLOCK,
+  TOURISM_STEP_LABEL,
+  type TourismTurnContext,
+  type TourismTurnMeta,
+} from "../../tourism/tourismTurn";
 import { checkToolCall } from "./toolAccess";
 import { evaluateAccess } from "../../../shared/agentAuth/routePolicy";
 import type { UserScope } from "../../../shared/agentAuth/userScope";
@@ -252,7 +264,7 @@ export type TurnTraceItem =
 
 // Adjunto del usuario disponible para la tool interna de librería.
 export interface TurnAttachment {
-  kind: "image" | "document";
+  kind: "image" | "document" | "video" | "audio";
   name?: string;
   mediaType: string;
   dataB64: string;
@@ -276,6 +288,7 @@ const INTERNAL_TOOL_NAMES = new Set([
   "capture_feedback_request",
   "add_image_to_library",
   PROPOSE_GROWTH_PLAN,
+  CONSULTAR_ESTADO_TURISTICO,
 ]);
 
 async function isReadOnlyCall(toolName: string): Promise<boolean> {
@@ -299,8 +312,15 @@ async function isReadOnlyCall(toolName: string): Promise<boolean> {
 function stepLabelForTool(toolName: string): string {
   const n = toolName.toLowerCase();
   if (n === PROPOSE_GROWTH_PLAN) return "Armando el plan…";
+  if (n === CONSULTAR_ESTADO_TURISTICO || n === TOURISM_STATUS_BLOCK) return TOURISM_STEP_LABEL;
   if (n === "add_image_to_library") return "Guardando en la librería…";
   if (n === "load_skill") return "Repasando el procedimiento…";
+  // Las crudas primero: `write_booking_api` matcheaba /booking/ más abajo y el
+  // usuario veía "Buscando reservas…" mientras el agente intentaba cambiar la
+  // configuración del motor.
+  if (/^write_.+_api$/.test(n)) return "Aplicando cambios…";
+  if (/^read_.+_api$/.test(n)) return "Buscando información…";
+  if (/^(update|create|delete|set|remove|add|publish|commit)_/.test(n)) return "Aplicando cambios…";
   if (n === "global_search" || n === "search_reservations") return "Buscando…";
   if (/linkhub/.test(n)) return "Revisando el LinkHub…";
   if (/(social|gbp|ota_|visibility)/.test(n)) return "Revisando la presencia online…";
@@ -347,6 +367,8 @@ export interface TurnResult {
    * forma de saber si esto sigue funcionando dentro de tres meses.
    */
   strategic?: StrategicTurnMeta;
+  /** Telemetría del estado turístico: qué se leyó, qué faltó y si hubo tarjeta. */
+  tourism?: TourismTurnMeta;
 }
 
 export interface StrategicTurnMeta {
@@ -421,6 +443,14 @@ interface RunTurnInput {
   planContext?: PlanToolContext;
   /** Telemetría de la preparación (lo que tardó la foto y qué faltó). */
   strategicMeta?: Pick<StrategicTurnMeta, "snapshotMs" | "missing" | "playbookIds" | "leverCount">;
+  /**
+   * Estado turístico ya resuelto por el service: el bloque va en el prompt y la
+   * tarjeta entra acá como una ejecución más, para que el mensaje persistido la
+   * vuelva a dibujar al releer la conversación (igual que el plan).
+   */
+  tourismContext?: TourismTurnContext;
+  /** Habilita `consultar_estado_turistico` (turnos normales con propiedad activa). */
+  tourismTool?: TourismToolContext;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -462,7 +492,8 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   // modelo la usó para anotar el pedido como feature faltante, gastando una de
   // las pocas iteraciones. La plataforma SÍ tiene con qué contestar eso; lo que
   // falta no es una función, es el plan.
-  if (agent.feedbackCapture.enabled && !input.planContext) {
+  // Tampoco en el turístico: no tiene tools y una sola vuelta.
+  if (agent.feedbackCapture.enabled && !input.planContext && profile.id !== "turistico") {
     tools.push(CAPTURE_FEEDBACK_TOOL_SCHEMA);
   }
   // Solo ofrecemos la tool de librería si el usuario adjuntó una imagen en este
@@ -476,6 +507,11 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   // sólo invita al modelo a llamarla y recibir un error.
   if (input.hasSkills) {
     tools.push(LOAD_SKILL_TOOL_SCHEMA);
+  }
+  // Si el estado turístico ya vino precargado, ofrecer la tool sólo invitaría
+  // a pedirlo de nuevo.
+  if (input.tourismTool && !input.tourismContext) {
+    tools.push(CONSULTAR_ESTADO_TURISTICO_TOOL);
   }
   // Tools internas del perfil (hoy: `propose_growth_plan` en el estratégico).
   for (const t of profile.internalTools ?? []) tools.push(t);
@@ -555,6 +591,27 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   let planOutcome: Awaited<ReturnType<typeof runProposeGrowthPlan>> | null = null;
   let planForced = false;
   const toolsUsed: string[] = [];
+
+  // La tarjeta turística la armó el código antes del turno. Entra a la traza y
+  // a las ejecuciones como un paso más: así el chat la dibuja igual en vivo y
+  // al releer la conversación, y el modelo nunca la redacta.
+  if (input.tourismContext?.card) {
+    toolsExecuted.push({
+      toolId: "internal-tourism-status",
+      toolName: TOURISM_STATUS_BLOCK,
+      inputArgs: { facetas: input.tourismContext.facets },
+      outcome: "success",
+      result: input.tourismContext.card,
+      durationMs: input.tourismContext.meta.prepMs,
+      retried: false,
+    });
+    trace.push({
+      kind: "tool",
+      toolName: TOURISM_STATUS_BLOCK,
+      label: TOURISM_STEP_LABEL,
+      outcome: "success",
+    });
+  }
 
   for (let iter = 0; iter < profile.maxIterations; iter++) {
     // Usamos el stream del SDK con dos fines: (1) reenviar EN VIVO los deltas
@@ -775,6 +832,7 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
         stopReason,
         modelUsed,
         strategic: strategicMeta(),
+        tourism: tourismMeta(),
       };
     }
 
@@ -824,6 +882,7 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
           onStep: input.onStep,
           scope: input.scope ?? null,
           planContext: input.planContext,
+          tourismTool: input.tourismTool,
         },
       );
       input.onStep?.({
@@ -903,6 +962,7 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
           stopReason: "max_iterations_finalized",
           modelUsed,
           strategic: strategicMeta(),
+          tourism: tourismMeta(),
         };
       }
     }
@@ -924,6 +984,7 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
     stopReason: "max_iterations_reached",
     modelUsed,
     strategic: strategicMeta(),
+    tourism: tourismMeta(),
   };
 
   /** Telemetría del turno estratégico, si lo fue. */
@@ -935,6 +996,25 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
       stepsDropped: planOutcome?.stepsDropped ?? 0,
       planId: planOutcome?.planId,
       forced: planForced,
+    };
+  }
+
+  /** Telemetría del estado turístico, si el turno lo usó (precargado o por tool). */
+  function tourismMeta(): TourismTurnMeta | undefined {
+    if (input.tourismContext) return input.tourismContext.meta;
+    if (!toolsUsed.includes(CONSULTAR_ESTADO_TURISTICO)) return undefined;
+    return {
+      mode: "tool",
+      facets: [],
+      prepMs: 0,
+      missing: [],
+      hubsCold: [],
+      locationSource: "",
+      cardShown: toolsExecuted.some(
+        (t) => t.toolName === CONSULTAR_ESTADO_TURISTICO && t.outcome === "success",
+      ),
+      otherPlace: null,
+      failure: null,
     };
   }
 }
@@ -1014,6 +1094,7 @@ interface ToolCallExtras {
   onStep?: (e: StepEvent) => void;
   scope?: UserScope | null;
   planContext?: PlanToolContext;
+  tourismTool?: TourismToolContext;
 }
 
 async function handleToolCall(
@@ -1069,6 +1150,42 @@ async function handleToolCall(
         // al retomar la conversación más tarde.
         result: outcome.ok ? (outcome.output as Record<string, unknown>) : undefined,
         errorMessage: outcome.ok ? undefined : (outcome.reason ?? "el plan no pasó la validación"),
+        durationMs: Date.now() - start,
+        retried: false,
+      },
+    };
+  }
+
+  // ---- Tool interna: consultar_estado_turistico ----
+  //
+  // Lee los hubs de /global en proceso (sin HTTP) a través del dossier de la
+  // propiedad. El modelo recibe un bloque de texto; la tarjeta con las cifras
+  // queda en `result`, que es lo que el chat dibuja.
+  if (block.name === CONSULTAR_ESTADO_TURISTICO) {
+    if (!extras.tourismTool) {
+      return {
+        output: { error: true, message: "No hay una propiedad activa en esta conversación." },
+        execMeta: {
+          toolId: "internal-tourism-status",
+          toolName: CONSULTAR_ESTADO_TURISTICO,
+          inputArgs: input,
+          outcome: "error",
+          errorMessage: "sin propiedad activa",
+          durationMs: Date.now() - start,
+          retried: false,
+        },
+      };
+    }
+    const outcome = await runTourismTool(input, extras.tourismTool);
+    return {
+      output: outcome.output,
+      execMeta: {
+        toolId: "internal-tourism-status",
+        toolName: CONSULTAR_ESTADO_TURISTICO,
+        inputArgs: input,
+        outcome: outcome.ok ? "success" : "error",
+        result: outcome.ok ? outcome.card : undefined,
+        errorMessage: outcome.ok ? undefined : outcome.reason,
         durationMs: Date.now() - start,
         retried: false,
       },
@@ -1579,7 +1696,7 @@ function buildToolErrorOutput(
       break;
     }
     case "not_found":
-      message = `No encontre el recurso solicitado para "${displayName}". Verifica que los datos sean correctos.`;
+      message = `No encontre el recurso solicitado para "${displayName}" (${err?.message ?? "404"}). Verifica los IDs; si el metodo o la ruta de una tool cruda no existen, usa la tool especifica.`;
       code = "not_found";
       break;
     case "validation":

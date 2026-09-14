@@ -1,0 +1,153 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "radiusKm": 500
+  },
+  "active": [],
+  "recent": [
+    {
+      "scope": "local",
+      "type": "EQ",
+      "typeName": "Terremoto",
+      "name": "Earthquake in Chile",
+      "country": "Chile",
+      "alertLevel": "Green",
+      "distanceKm": 342,
+      "from": "2026-09-13",
+      "to": "2026-09-13",
+      "ongoing": false,
+      "url": "https://www.gdacs.org/report.aspx?eventid=1565073&episodeid=1732838&eventtype=EQ"
+    }
+  ],
+  "quakes": [
+    {
+      "magnitude": 5.1,
+      "depthKm": 59,
+      "place": "26 km NW of Coquimbo, Chile",
+      "time": "2026-09-03",
+      "distanceKm": 430,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000tduc"
+    },
+    {
+      "magnitude": 5.1,
+      "depthKm": 24,
+      "place": "52 km NNW of Valparaíso, Chile",
+      "time": "2026-07-15",
+      "distanceKm": 283,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000t0it"
+    },
+    {
+      "magnitude": 5,
+      "depthKm": 12,
+      "place": "76 km W of Coquimbo, Chile",
+      "time": "2026-07-31",
+      "distanceKm": 458,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000th96"
+    },
+    {
+      "magnitude": 5,
+      "depthKm": 52,
+      "place": "39 km SSW of Ovalle, Chile",
+      "time": "2026-07-04",
+      "distanceKm": 322,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000ta18"
+    },
+    {
+      "magnitude": 5,
+      "depthKm": 22,
+      "place": "54 km NNW of Valparaíso, Chile",
+      "time": "2026-07-06",
+      "distanceKm": 278,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000tahc"
+    },
+    {
+      "magnitude": 4.9,
+      "depthKm": 26,
+      "place": "46 km NNW of Valparaíso, Chile",
+      "time": "2026-07-06",
+      "distanceKm": 275,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000taht"
+    },
+    {
+      "magnitude": 4.8,
+      "depthKm": 16,
+      "place": "49 km NW of Valparaíso, Chile",
+      "time": "2026-08-16",
+      "distanceKm": 296,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/usd0015e8r"
+    },
+    {
+      "magnitude": 4.8,
+      "depthKm": 48,
+      "place": "29 km WSW of Santa Cruz, Chile",
+      "time": "2026-07-28",
+      "distanceKm": 333,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000tgav"
+    },
+    {
+      "magnitude": 4.8,
+      "depthKm": 65,
+      "place": "27 km S of Coquimbo, Chile",
+      "time": "2026-07-16",
+      "distanceKm": 378,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000t0xw"
+    },
+    {
+      "magnitude": 4.8,
+      "depthKm": 82,
+      "place": "29 km WSW of Salamanca, Chile",
+      "time": "2026-09-03",
+      "distanceKm": 250,
+      "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000te5e"
+    }
+  ],
+  "volcanoes": [
+    {
+      "name": "Nevados del Chillan Volcano, Chile",
+      "distanceKm": 499,
+      "since": "2026-06-15",
+      "url": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_20710"
+    }
+  ],
+  "anomalies": [
+    {
+      "kind": "heat",
+      "startDate": "2026-09-17",
+      "endDate": "2026-09-20",
+      "days": 4,
+      "peakC": 25.7,
+      "thresholdC": 20.8
+    }
+  ],
+  "airliftRisk": [],
+  "headline": {
+    "worstAlert": null,
+    "activeCount": 0,
+    "paths": []
+  },
+  "window": {
+    "days": 30,
+    "from": "2026-08-15",
+    "to": "2026-09-14"
+  },
+  "coverage": {
+    "gdacs": true,
+    "quakes": true,
+    "volcanoes": true,
+    "temperature": true,
+    "gaps": [
+      "Escasez de agua potable: no hay fuente abierta con actualizacion util",
+      "Deslizamientos: GDACS solo los reporta cuando acompanan a otra amenaza",
+      "Avisos de tsunami en tiempo real: los centros regionales no exponen API comun"
+    ]
+  },
+  "sources": [
+    "GDACS (Comision Europea / ONU)",
+    "USGS (catalogo sismico)",
+    "NASA EONET (volcanes activos)",
+    "Open-Meteo (anomalias termicas)",
+    "OurAirports (cruce con acceso aereo)"
+  ],
+  "timestamp": "2026-09-14T05:00:10.172Z"
+}

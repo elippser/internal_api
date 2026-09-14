@@ -1,0 +1,32 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "radiusKm": 100
+  },
+  "window": {
+    "from": "2026-09-14",
+    "to": "2027-09-09"
+  },
+  "events": [],
+  "byCategory": {},
+  "headline": null,
+  "coverage": {
+    "megaEvents": true,
+    "formula1": true,
+    "recurring": true,
+    "leagueFixtures": true,
+    "gaps": [
+      "Copa America 2028: sede sin adjudicar (EE.UU. y Ecuador en negociacion)",
+      "Juegos Olimpicos 2036 y 2038: sin adjudicar",
+      "Mundial 2034: FIFA todavia no publico fechas exactas ni sedes por ciudad",
+      "Sin cobertura: MotoGP, boxeo/UFC, esports, regatas y juegos regionales (no hay API libre)"
+    ]
+  },
+  "sources": [
+    "Tabla curada (mega-eventos y anuales de sede fija)",
+    "Jolpica / Ergast (Formula 1)",
+    "Intelligence Hub (fixtures de liga)"
+  ],
+  "timestamp": "2026-09-14T05:00:08.193Z"
+}

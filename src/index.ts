@@ -18,6 +18,7 @@ import { knowledgeRouter } from "./modules/knowledge/knowledge.router";
 import { feedbackRouter } from "./modules/feedback/feedback.router";
 import { conversationsRouter } from "./modules/conversations/conversations.router";
 import { growthRouter } from "./modules/growth/growth.router";
+import { tourismRouter } from "./modules/tourism/tourism.router";
 import { startSessionExpiryJob } from "./modules/conversations/services/sessionExpiryJob";
 import { ticketsRouter } from "./modules/tickets/tickets.router";
 import { startTicketingCron } from "./modules/tickets/ticketingCron";
@@ -155,6 +156,7 @@ app.use(`${BASE}/feedback`, feedbackRouter);
 app.use(`${BASE}/conversations`, conversationsRouter);
 // Planes de crecimiento del turno estrategico (ver modules/growth).
 app.use(`${BASE}/growth`, growthRouter);
+app.use(`${BASE}/tourism`, tourismRouter);
 app.use(`${BASE}/tickets`, ticketsRouter);
 app.use(`${BASE}/hotels`, hotelsRouter);
 app.use(`${BASE}/access`, accessRouter);

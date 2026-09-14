@@ -19,6 +19,7 @@ import {
   withReasoningHeadroom,
 } from "../../../shared/llm/provider";
 import { filterReadOnlyToolIds } from "./toolExecutor";
+import type { TourismFacet } from "../../tourism/tourism.types";
 import {
   SUB_AGENTS,
   DEFAULT_SUB_AGENT,
@@ -53,6 +54,12 @@ export interface RouteDecision {
   strategicRequest: boolean;
   /** Numero de paso de un plan que el usuario nombro ("hace el paso 2"). */
   planStepNumber: number | null;
+  /**
+   * Pregunta de contexto turistico de la zona (movimiento, eventos, entorno,
+   * temporada). El service arma el dossier en codigo y, si la pregunta es solo
+   * eso, la contesta con el perfil turistico en vez del loop de tools + web.
+   */
+  tourism: { facets: TourismFacet[] } | null;
 }
 
 // ── Heuristicas ──────────────────────────────────────────────────────────────
@@ -123,22 +130,87 @@ export function planStepNumber(message: string): number | null {
 const WEB_INTENT =
   /\b(busc\w*\s+(en\s+)?(la\s+)?(web|internet|google|l[ií]nea|online)|en\s+(la\s+)?(web|internet)|googlea\w*|noticias?|evento|eventos|cartelera|clima|pron[oó]stico\s+del\s+tiempo|cotizaci\w*|d[oó]lar|cerca\s+(de|m[ií]o|tuy)|cerca\s+de\s+(donde|mi|aqu[ií]|ac[aá])|qu[eé]\s+hacer\b|restaurante|hotel(es)?\s+cerca)/i;
 
+// ── Pregunta TURISTICA ──────────────────────────────────────────────────────
+//
+// "¿Como viene el movimiento en mi zona?", "¿hay algo grande cerca este
+// finde?", "¿que tan bien ubicado estoy?", "¿se viene una temporada fuerte?".
+// Antes caian en WEB_INTENT (evento/clima/cerca) y se contestaban buscando en
+// Google, o en DEEP por "tendencia". Ahora las contestan los hubs de /global,
+// leidos en codigo (ver modules/tourism).
+
+const TOURISM_STRONG =
+  /\b(movimiento\s+tur[ií]stic\w*|turismo|turistas?|tur[ií]stic[oa]s?\b|estacionalidad|fin(?:es)?\s+de\s+semana\s+largos?|findes?\s+largos?|feriados?|puentes?\s+tur[ií]stic\w*|vacaciones\s+(?:de\s+)?(?:invierno|verano|escolares)|receso\s+escolar|eventos?\s+(?:cerca|pr[oó]xim\w*|grandes?|importantes?|en\s+(?:la|mi)\s+(?:zona|ciudad|provincia))|(?:congresos?|ferias?|festival(?:es)?|recitales?|conciertos?|partidos?|maratones?|shows?)\s+(?:cerca|pr[oó]xim\w*|en\s+(?:la|mi)\s+(?:zona|ciudad|provincia))|(?:algo|qu[eé])\b[^.?!]{0,25}\b(?:pasando|pasa|hay)\b[^.?!]{0,25}\bcerca\b|mi\s+(?:zona|ubicaci[oó]n|entorno|barrio|ciudad|provincia|regi[oó]n|destino|localidad)|tendencias?\s+(?:tur[ií]stic\w*|de\s+(?:la\s+)?(?:zona|ciudad|demanda)|en\s+(?:la|mi)\s+(?:zona|ciudad|provincia|regi[oó]n))|bien\s+ubicad[oa]|caminab\w*|mejor\s+[eé]poca|clima\s+(?:de|en)\s+(?:la|mi)\s+zona|c[oó]mo\s+(?:viene|est[aá]|anda)\s+(?:el\s+)?(?:movimiento|turismo|la\s+zona|la\s+temporada|la\s+demanda)|va\s+a\s+haber\s+(?:mucho\s+|m[aá]s\s+)?(?:turismo|gente|movimiento))/i;
+
+// "Temporada" sola es ambigua: en el PMS es tambien un concepto de tarifas
+// ("carga la tarifa de temporada alta"). Solo cuenta sin contexto de precios.
+const TOURISM_SEASON =
+  /\btemporadas?\s+(?:alta|baja|fuerte|floja|tur[ií]stica|de\s+(?:verano|invierno))|\b(?:se\s+viene|viene|llega)\s+(?:la\s+|una\s+)?temporada/i;
+const RATE_CONTEXT =
+  /\b(tarifas?|precios?|plan(?:es)?\s+tarifari\w*|rate\s*plan|m[ií]nimo\s+de\s+noches|restricci\w*)\b/i;
+
+// Pedido EXPLICITO de buscar en la web: gana sobre turismo. "Busca en google
+// que eventos hay" quiere Google, no el dossier.
+const WEB_EXPLICIT =
+  /\b(busc\w*\s+(en\s+)?(la\s+)?(web|internet|google|l[ií]nea|online)|googlea\w*|en\s+(la\s+)?(web|internet))\b/i;
+
+// Curar los eventos del RMS (aprobar/descartar sugeridos) es una operacion de
+// revenue, no una pregunta de contexto.
+const MARKET_EVENTS_ADMIN =
+  /\beventos?\s+(?:de\s+mercado|sugeridos?|aprobados?|descartados?)|\b(?:aprob|descart|sincroniz)\w*\s+(?:el\s+|los\s+|un\s+|este\s+)?eventos?/i;
+
+const FACET_PATTERNS: Array<[TourismFacet, RegExp]> = [
+  ["entorno", /\b(ubicad|ubicaci[oó]n|entorno|barrio|caminab|a\s+pie|transporte|colectivo|subte|parada|ruido|restaurantes?|gastronom|qu[eé]\s+(?:hay|tengo)\s+cerca)/i],
+  // Con límite de palabra al final: sin él, "ferias?" matchea "feriado".
+  ["eventos", /\b(eventos?|congresos?|ferias?|festival(?:es)?|recitales?|conciertos?|partidos?|marat[oó]n|maratones|shows?|espect[aá]culos?|pasando\s+cerca|pasa\s+cerca)\b/i],
+  ["estacionalidad", /\b(temporadas?|estacionalidad|feriados?|fin(?:es)?\s+de\s+semana\s+largos?|findes?\s+largos?|puentes?|vacaciones|receso|clima|mejor\s+[eé]poca|invierno|verano|primavera|oto[ñn]o|lluvias?)\b/i],
+  ["movimiento", /\b(movimiento|turismo|turistas?|gente|demanda|inter[eé]s|b[uú]squedas?|tendencias?|c[oó]mo\s+(?:viene|est[aá]|anda))\b/i],
+];
+
+export function isTourismQuestion(message: string): boolean {
+  if (WEB_EXPLICIT.test(message) || MARKET_EVENTS_ADMIN.test(message)) return false;
+  if (TOURISM_STRONG.test(message)) return true;
+  return TOURISM_SEASON.test(message) && !RATE_CONTEXT.test(message);
+}
+
+/**
+ * Facetas pedidas, como mucho dos. "movimiento" es el comodin: si hay una
+ * faceta especifica, esa manda. Sin ninguna, "movimiento".
+ */
+export function tourismFacets(message: string): TourismFacet[] {
+  const hit = FACET_PATTERNS.filter(([, re]) => re.test(message)).map(([f]) => f);
+  if (hit.length === 0) return ["movimiento"];
+  const specific = hit.filter((f) => f !== "movimiento");
+  return (specific.length ? specific : hit).slice(0, 2);
+}
+
 interface HeuristicHit {
   id: SubAgentId;
   /** Pedido de objetivo abierto: dispara el perfil de turno estrategico. */
   strategic?: boolean;
+  /** Pregunta de contexto turistico: facetas pedidas. */
+  tourism?: TourismFacet[];
 }
 
 function heuristicSubAgent(message: string): HeuristicHit | null {
   const t = message.trim();
   if (!t) return null;
+  const tourism = isTourismQuestion(t) ? tourismFacets(t) : undefined;
   // ESTRATEGICO va PRIMERO, antes que DEEP. "quiero mejorar mi estrategia de
   // ocupacion" matchea DEEP por la palabra "estrateg" y terminaria como un
   // analisis suelto: el modelo leeria cinco tools sin estructura y contestaria
   // el parrafo generico de siempre. Con el objetivo abierto detectado primero,
   // el turno arranca con la foto del hotel ya resuelta.
   if (STRATEGIC_INTENT.test(t) && !ENTITY_REF.test(t)) {
-    return { id: "analista", strategic: true };
+    return { id: "analista", strategic: true, tourism };
+  }
+  // TURISTICO va antes que DEEP/REVENUE/WEB: "¿se viene una temporada fuerte?"
+  // no es un analisis ni una busqueda en Google, es una lectura de los hubs.
+  // Si ademas pide analizar u operar, conserva ese sub-agente con el dossier
+  // precargado; si es solo contexto, lo atiende el perfil turistico (consulta).
+  if (tourism) {
+    if (DEEP_INTENT.test(t) || REVENUE_INTENT.test(t)) return { id: "analista", tourism };
+    if (WRITE_INTENT.test(t)) return { id: "operativo", tourism };
+    return { id: "consulta", tourism };
   }
   // El analisis manda sobre la escritura: "analiza si conviene cancelar..." es
   // razonamiento, no una orden de cancelar.
@@ -168,9 +240,13 @@ const CLASSIFIER_SYSTEM = [
   "  razonar en varios pasos.",
   '- "standard": ejecutar una operacion del PMS (crear/editar/cancelar/asignar/',
   "  cambiar estado, gestionar reservas o habitaciones, configurar), una consulta",
-  "  que probablemente derive en una accion, o que requiera BUSCAR INFORMACION",
-  "  ACTUAL/EXTERNA en la web (eventos, noticias, clima, lugares, datos del mundo",
-  "  real): eso necesita web_search, que solo existe en standard o deep.",
+  "  que probablemente derive en una accion, o que requiera BUSCAR EN LA WEB algo",
+  "  puntual con nombre propio (una noticia, un lugar concreto, una cotizacion):",
+  "  eso necesita web_search, que solo existe en standard o deep.",
+  '- "turistico": pregunta por el CONTEXTO de la zona del alojamiento: movimiento',
+  "  o demanda turistica, eventos cercanos, feriados, fines de semana largos,",
+  "  temporada o clima de la zona, o como es el entorno y la ubicacion. NO es",
+  "  turistico si pide buscar algo en la web ni si es una operacion del PMS.",
   '- "deep": requiere razonamiento de varios pasos: analizar, comparar, optimizar,',
   "  recomendar la mejor opcion, diagnosticar o cruzar datos de varias fuentes.",
   "  TODO lo de revenue management entra aca aunque suene simple: pace, pickup,",
@@ -190,14 +266,20 @@ const CLASSIFIER_SYSTEM = [
  * prende el flag `strategicRequest`. El modelo y el alcance de tools los sigue
  * poniendo el sub-agente analista; lo que cambia es como se arma el turno.
  */
-function parseTier(text: string): { tier: SubAgentTier; strategic: boolean } | null {
+function parseTier(
+  text: string,
+): { tier: SubAgentTier; strategic: boolean; tourism: boolean } | null {
   const t = text.toLowerCase();
   if (t.includes("estrategico") || t.includes("estratégico")) {
-    return { tier: "deep", strategic: true };
+    return { tier: "deep", strategic: true, tourism: false };
   }
-  if (t.includes("deep")) return { tier: "deep", strategic: false };
-  if (t.includes("quick")) return { tier: "quick", strategic: false };
-  if (t.includes("standard")) return { tier: "standard", strategic: false };
+  // "turistico" tampoco es un tier: es consulta + dossier turistico.
+  if (t.includes("turistico") || t.includes("turístico")) {
+    return { tier: "quick", strategic: false, tourism: true };
+  }
+  if (t.includes("deep")) return { tier: "deep", strategic: false, tourism: false };
+  if (t.includes("quick")) return { tier: "quick", strategic: false, tourism: false };
+  if (t.includes("standard")) return { tier: "standard", strategic: false, tourism: false };
   return null;
 }
 
@@ -234,6 +316,7 @@ async function classifyWithLLM(
     return {
       id: TIER_TO_SUB_AGENT[parsed.tier],
       strategic: parsed.strategic,
+      ...(parsed.tourism ? { tourism: tourismFacets(message) } : {}),
     };
   } catch (err) {
     console.warn(
@@ -270,15 +353,19 @@ export async function routeTurn(input: {
       reason: `paso-de-plan:${stepNumber}`,
       strategicRequest: false,
       planStepNumber: stepNumber,
+      tourism: null,
     };
   }
 
+  const flags = (h: HeuristicHit) =>
+    `${h.strategic ? "+estrategico" : ""}${h.tourism ? `+turistico(${h.tourism.join(",")})` : ""}`;
+
   let hit = heuristicSubAgent(input.userMessage);
-  let reason = hit ? `heuristica:${hit.id}${hit.strategic ? "+estrategico" : ""}` : "";
+  let reason = hit ? `heuristica:${hit.id}${flags(hit)}` : "";
 
   if (!hit && routerLlmEnabled()) {
     hit = await classifyWithLLM(input.userMessage, input.recentContext);
-    reason = hit ? `clasificador:${hit.id}${hit.strategic ? "+estrategico" : ""}` : "";
+    reason = hit ? `clasificador:${hit.id}${flags(hit)}` : "";
   }
 
   if (!hit) {
@@ -298,5 +385,6 @@ export async function routeTurn(input: {
     reason,
     strategicRequest: hit.strategic === true,
     planStepNumber: null,
+    tourism: hit.tourism?.length ? { facets: hit.tourism } : null,
   };
 }

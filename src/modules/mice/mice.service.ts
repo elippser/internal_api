@@ -16,23 +16,12 @@
 // Meetup. Lo que no tiene es el calendario ancla del sector: MWC, CES, ITB,
 // FITUR, Davos, el G20 — que es justo lo que agota una plaza entera.
 
-import { fetchIntelligence, isConfigured } from "../global/lib/intelligence";
+import { eventFeedAvailable, getEventFeed } from "../intelligence/eventFeed";
 import { congressesFor, PENDING_MICE } from "./congresses";
 import type { DayPattern, MiceCoverage, MiceEvent, MicePointPayload } from "./mice.types";
 
 const MS_DAY = 86_400_000;
 const iso = (d: Date): string => d.toISOString().slice(0, 10);
-
-interface CacheEntry<T> { ts: number; value: T }
-const store = new Map<string, CacheEntry<unknown>>();
-
-async function memo<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
-  const hit = store.get(key) as CacheEntry<T> | undefined;
-  if (hit && Date.now() - hit.ts < ttlMs) return hit.value;
-  const value = await load();
-  store.set(key, { ts: Date.now(), value });
-  return value;
-}
 
 function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371;
@@ -103,9 +92,10 @@ const durationDays = (start: string, end: string): number =>
   ) + 1;
 
 async function listings(): Promise<MiceEvent[]> {
-  if (!isConfigured()) return [];
+  if (!eventFeedAvailable()) return [];
   try {
-    const data = await memo("intel:events", 30 * 60 * 1000, () => fetchIntelligence());
+    // Feed compartido con cultura y deportes, leído en proceso (ver eventFeed.ts).
+    const data = await getEventFeed();
     const out: MiceEvent[] = [];
     (data.events ?? []).forEach((e: any, i: number) => {
       if (typeof e.lat !== "number" || typeof e.lng !== "number") return;
@@ -229,7 +219,7 @@ export async function getMicePoint(
       : (shown[0] ?? null);
 
   const gaps: string[] = [...PENDING_MICE];
-  if (!isConfigured()) gaps.push("Sin agenda local: el intelligence-hub no esta configurado");
+  if (!eventFeedAvailable()) gaps.push("Sin agenda local: el intelligence-hub no esta configurado");
   else if (listingsTotal === 0) gaps.push("El intelligence-hub no tiene eventos corporativos en este radio");
 
   const coverage: MiceCoverage = {

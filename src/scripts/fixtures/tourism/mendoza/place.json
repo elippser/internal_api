@@ -1,0 +1,77 @@
+{
+  "location": {
+    "lat": -32.8895,
+    "lng": -68.8458,
+    "radiusKm": 1
+  },
+  "proximity": {
+    "attraction": null,
+    "museum": null,
+    "park": null,
+    "beach": null,
+    "water": null,
+    "peak": null,
+    "university": null,
+    "hospital": null,
+    "conventionCentre": null,
+    "transitStop": null,
+    "busTerminal": null,
+    "airport": {
+      "name": "Governor Francisco Gabrielli International Airport",
+      "distanceM": 8000,
+      "iata": "MDZ"
+    }
+  },
+  "density": {
+    "gastronomy": 0,
+    "nightlife": 0,
+    "shops": 0,
+    "offices": 0,
+    "chains": 0,
+    "chainNames": []
+  },
+  "walkability": {
+    "score": 0,
+    "components": {
+      "amenities": 0,
+      "pedestrian": 0,
+      "transit": 0
+    },
+    "label": "Depende del auto"
+  },
+  "noise": {
+    "score": 14,
+    "label": "Tranquilo",
+    "sources": [
+      "aeropuerto a 8 km"
+    ]
+  },
+  "view": {
+    "elevationM": 763,
+    "reliefM": -9,
+    "hints": []
+  },
+  "accessibility": {
+    "taggedAccessible": 0,
+    "taggedTotal": 0,
+    "share": null
+  },
+  "profile": "Entorno tranquilo",
+  "coverage": {
+    "census": false,
+    "elevation": true,
+    "gaps": [
+      "Overpass no respondio: no hay censo del entorno. No es que no haya nada alrededor",
+      "Percepcion de seguridad del barrio: no hay fuente abierta a escala de cuadra. El §9 llega hasta el pais y no se deriva de otra cosa",
+      "Ruido: es geometria, no acustica. Dice que hay una autopista a 200 m, no cuantos decibeles entran por la ventana",
+      "Vista: depende del piso y la orientacion del cuarto, que ningun mapa sabe. Solo se indica si hay algo que mirar",
+      "Accesibilidad: sale de la etiqueta wheelchair de OSM, que muy pocos lugares completan"
+    ]
+  },
+  "sources": [
+    "OpenStreetMap Overpass (entorno)",
+    "Open-Meteo (elevacion)",
+    "OurAirports (aeropuerto de referencia)"
+  ],
+  "timestamp": "2026-09-14T05:02:16.520Z"
+}
