@@ -45,6 +45,8 @@ import {
   publicSiteRouter,
 } from "./modules/mktsite/mktsite.router";
 import { mktprojectRouter } from "./modules/mktproject/mktproject.router";
+import { publicVideoVoRouter } from "./modules/mktvideo/mktvideo.router";
+import { mktvideoRouter } from "./modules/mktvideo/mktvideo.internal.router";
 import { dnsRouter } from "./modules/dns/dns.router";
 import { infraRouter } from "./modules/infra/infra.router";
 import { architectureRouter } from "./modules/architecture/architecture.router";
@@ -177,6 +179,8 @@ app.use(`${BASE}/campaigns`, campaignsRouter);
 // las conversiones y la captura de leads, que siguen viviendo en la DB.
 app.use(`${BASE}/mkt/project`, mktprojectRouter);
 app.use(`${BASE}/mkt/site`, mktsiteRouter);
+// Modulo Videos del panel: el montaje de la voz en off, uno por idioma.
+app.use(`${BASE}/mkt/videos`, mktvideoRouter);
 // DNS de roombir.com en Cloudflare. Vive bajo /mkt porque el dominio es del
 // sitio publico, pero lo que administra es la zona entera de la plataforma:
 // los 17 hostnames de DNS-CLOUDFLARE-roombir.md salen de los .env.production.
@@ -223,6 +227,9 @@ app.use("/public/leads", publicLeadsRouter);
 // El catalogo de planes que pinta <PlansMkt/> en el sitio de roombir.
 app.use("/public/plans", publicPlansRouter);
 app.use("/public/mkt/nps", publicNpsRouter);
+// El montaje de la voz en off del video de portada. No lo llama el navegador:
+// lo llaman las API routes de mkt-renderer con X-Internal-Secret.
+app.use("/public/mkt/video-vo", publicVideoVoRouter);
 app.use("/s", publicSiteRouter);
 
 // Hubs propios de la vista /global (event-list.md §1 a §5): escritos a mano,
