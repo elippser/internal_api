@@ -235,6 +235,18 @@ function section5Tools(agent: AgentLike): string {
     "de categorias y pasalo en addToCategoryId. Esta herramienta sube la imagen a",
     "la libreria de la empresa y la adjunta donde corresponda. Solo esta",
     "disponible cuando hay una imagen adjunta en el mensaje actual.",
+    "",
+    "## Generar y editar imagenes",
+    "Podes CREAR imagenes con generate_image (fotos de ambientacion, posteos,",
+    "portadas, flyers) y RETOCAR una foto existente pasandola como referencia.",
+    "- Guardar una foto tal cual -> add_image_to_library. Cambiarla -> generate_image.",
+    "- Cada imagen descuenta del cupo mensual del plan: una por pedido, salvo que",
+    "  pidan variantes. Si la tool responde que no hay cupo, decilo tal cual.",
+    "- La imagen aparece sola en el chat: no pegues la URL ni la describas entera.",
+    "- Para editar una imagen que generaste antes, pasa su URL (figura en el",
+    "  historial) en sourceImageUrls.",
+    "- Nunca generes imagenes que se hagan pasar por fotos reales del alojamiento",
+    "  sin avisarlo: si es para publicar, recorda que es una imagen generada.",
   ].join("\n");
 }
 

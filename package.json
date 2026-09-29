@@ -81,7 +81,8 @@
     "e2e:tourism": "ts-node --transpile-only src/scripts/e2eTourism.ts",
     "diagnose:ia-credits": "ts-node --transpile-only src/scripts/diagnoseIaCredits.ts",
     "migrate:ia-product-key": "ts-node --transpile-only src/scripts/migrateIaProductKey.ts",
-    "fix:ia-plans": "ts-node --transpile-only src/scripts/fixIaPlans.ts"
+    "fix:ia-plans": "ts-node --transpile-only src/scripts/fixIaPlans.ts",
+    "set:plan-image-limits": "ts-node --transpile-only src/scripts/setPlanImageLimits.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
@@ -104,6 +105,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.10.1",
     "pdf-parse": "^1.1.1",
+    "playwright-core": "1.57.0",
     "uuid": "^9.0.1",
     "ws": "^8.21.0"
   },

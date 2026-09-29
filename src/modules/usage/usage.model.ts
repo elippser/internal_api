@@ -10,6 +10,10 @@ export const USAGE_SOURCES = [
   // faltaba en el enum: el Joi lo rechazaba con 400 y, como el cliente es
   // fire-and-forget, ese consumo se perdía sin dejar rastro.
   "template_autofill", // autocompletado de plantillas de sitio (pms-core/api)
+  // Imágenes de Roombir IA (tool generate_image). Una fila = una imagen: el
+  // cupo mensual del plan se cuenta con estas filas, y los tokens van en cero
+  // para no descontar del cupo de texto (el costo real viaja en costUsd).
+  "image_generation",
 ] as const;
 export type UsageSource = (typeof USAGE_SOURCES)[number];
 

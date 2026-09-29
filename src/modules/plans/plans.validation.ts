@@ -70,6 +70,7 @@ const limitsSchema = Joi.object({
   // Dia de renovacion del cupo de IA. Topeado en 28: un plan con reset el 30
   // no tendria periodo en febrero.
   iaResetDayUTC: Joi.number().integer().min(1).max(28),
+  iaMonthlyImages: Joi.number().integer().min(0).max(100_000).allow(null),
 });
 
 const planBody = {

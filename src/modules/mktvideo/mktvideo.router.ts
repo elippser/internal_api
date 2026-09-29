@@ -3,6 +3,8 @@ import Joi from "joi";
 import { requireInternalSecret } from "../../shared/middleware/internalSecret";
 import { fail, ok } from "../../shared/utils/http";
 import { MktVideoVoiceover } from "./mktvideo.model";
+// El GET y el PUT de un segmento son del video de PORTADA; el GET de dos segmentos (video/idioma) lee los demás.
+import { montajeFilter, videoDef } from "./mktvideo.catalog";
 
 /**
  * El montaje de la voz en off del video de portada.
@@ -78,8 +80,32 @@ publicVideoVoRouter.get("/:locale", async (req, res) => {
     return fail(res, 400, "Idioma desconocido", "invalid_locale");
   }
   try {
-    const doc = await MktVideoVoiceover.findOne({ locale }).lean();
+    const doc = await MktVideoVoiceover.findOne(montajeFilter("portada", locale)).lean();
     return ok(res, {
+      locale,
+      tracks: doc?.tracks ?? [],
+      videoMs: doc?.videoMs ?? 0,
+      scenes: doc?.scenes ?? {},
+      updatedAt: doc ? (doc as any).updatedAt : null,
+    });
+  } catch (err) {
+    return handleErr(res, err);
+  }
+});
+
+/**
+ * El montaje de los OTROS videos (ia, propiedades, habitaciones, motor…), para su reproductor público.
+ * Sólo lectura: se escriben desde el panel (`mktvideo.internal.router.ts`), nunca desde el sitio.
+ */
+publicVideoVoRouter.get("/:video/:locale", async (req, res) => {
+  const video = String(req.params.video);
+  const locale = String(req.params.locale);
+  if (!videoDef(video) || video === "portada") return fail(res, 404, "Video desconocido", "invalid_video");
+  if (!LOCALES.includes(locale)) return fail(res, 400, "Idioma desconocido", "invalid_locale");
+  try {
+    const doc = await MktVideoVoiceover.findOne(montajeFilter(video, locale)).lean();
+    return ok(res, {
+      video,
       locale,
       tracks: doc?.tracks ?? [],
       videoMs: doc?.videoMs ?? 0,
@@ -113,7 +139,7 @@ publicVideoVoRouter.put("/:locale", async (req, res) => {
 
   try {
     if (value.expectedUpdatedAt) {
-      const actual = await MktVideoVoiceover.findOne({ locale }).lean();
+      const actual = await MktVideoVoiceover.findOne(montajeFilter("portada", locale)).lean();
       const sello = actual ? new Date((actual as any).updatedAt).toISOString() : null;
       if (sello && sello !== new Date(value.expectedUpdatedAt).toISOString()) {
         return fail(res, 409, "El montaje cambio desde que se abrio", "stale_write");
@@ -121,7 +147,7 @@ publicVideoVoRouter.put("/:locale", async (req, res) => {
     }
 
     const doc = await MktVideoVoiceover.findOneAndUpdate(
-      { locale },
+      montajeFilter("portada", locale),
       { $set: { tracks: value.tracks, videoMs: value.videoMs, scenes: value.scenes } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ).lean();

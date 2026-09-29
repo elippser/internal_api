@@ -888,8 +888,19 @@ export const conversationsService = {
   // Créditos de IA de la company (bolsa mensual de tokens): consumido vs total.
   // Es lo que el sidebar del chat muestra como "uso / restante".
   async getCredits(companyId: string | undefined) {
-    const credits = await planCreditsService.getCompanyCredits(companyId ?? "");
-    return { ...credits, enforcement: iaEnforcementOn() };
+    const [credits, images] = await Promise.all([
+      planCreditsService.getCompanyCredits(companyId ?? ""),
+      planCreditsService.checkImageQuota(companyId ?? ""),
+    ]);
+    return {
+      ...credits,
+      enforcement: iaEnforcementOn(),
+      images: {
+        monthlyImages: images.monthlyImages,
+        used: images.used,
+        remaining: images.remaining,
+      },
+    };
   },
 
   async listMessages(sessionId: string) {
@@ -1193,13 +1204,37 @@ async function buildHistoryWindow(sessionId: string) {
   // se replican (sesion-larga = costo + complejidad sin beneficio claro).
   // Los videos y audios de mensajes anteriores vuelven como su informe
   // escrito: sin esto, "¿y qué más se veía?" no tiene de dónde contestar.
-  return ordered.map((m) => ({
-    role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-    content:
-      m.role === "user" && m.attachmentContext
+  // Las imágenes que generó Roombir IA vuelven como su URL: el texto de la
+  // respuesta no la repite (la tarjeta ya la muestra), y sin ella "hacela más
+  // luminosa" en el mensaje siguiente no tiene qué editar.
+  return ordered.map((m) => {
+    if (m.role === "assistant") {
+      const images = generatedImageUrls(m.agentMeta?.toolsExecuted);
+      return {
+        role: "assistant" as const,
+        content: images.length
+          ? `${m.content}\n\n[Imágenes generadas en este mensaje: ${images.join(" , ")}]`
+          : m.content,
+      };
+    }
+    return {
+      role: "user" as const,
+      content: m.attachmentContext
         ? `${m.content}\n\n${m.attachmentContext}`
         : m.content,
-  }));
+    };
+  });
+}
+
+function generatedImageUrls(executed: unknown): string[] {
+  if (!Array.isArray(executed)) return [];
+  const urls: string[] = [];
+  for (const t of executed as Array<{ toolName?: string; outcome?: string; result?: any }>) {
+    if (t?.toolName !== "generate_image" || t.outcome !== "success") continue;
+    const url = t.result?.url;
+    if (typeof url === "string") urls.push(url);
+  }
+  return urls;
 }
 
 interface HttpError extends Error {

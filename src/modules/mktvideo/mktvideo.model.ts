@@ -75,8 +75,13 @@ const trackSchema = new Schema(
 
 const voiceoverSchema = new Schema(
   {
-    /** es · en · pt · fr · de. Uno por idioma del sitio. */
-    locale: { type: String, required: true, unique: true, index: true },
+    /**
+     * Qué video (`mktvideo.catalog.ts`: portada, ia, propiedades, …). Las filas
+     * de antes de que hubiera más de un video no lo tienen: son de `portada`.
+     */
+    videoId: { type: String, default: "portada", index: true },
+    /** es · en · pt · fr · de para la portada; `<video>:<idioma>` (`ia:es`) para los demás (ver `storedLocale`). */
+    locale: { type: String, required: true },
     tracks: { type: [trackSchema], default: [] },
     /** Lo que duraba el video cuando se guardo, para avisar si despues cambio. */
     videoMs: { type: Number, default: 0 },
@@ -91,5 +96,19 @@ const voiceoverSchema = new Schema(
   { timestamps: true, collection: "mkt_video_voiceovers" },
 );
 
+// Un montaje por video y por idioma. (Antes era uno por idioma: ver `ensureVideoIndexes`.)
+voiceoverSchema.index({ videoId: 1, locale: 1 }, { unique: true });
+
 export type MktVideoVoiceoverDoc = InferSchemaType<typeof voiceoverSchema>;
 export const MktVideoVoiceover = model("MktVideoVoiceover", voiceoverSchema);
+
+let indexes: Promise<void> | null = null;
+/** El índice compuesto video + idioma. Una vez por proceso. */
+export function ensureVideoIndexes(): Promise<void> {
+  indexes ??= (async () => {
+    // El índice único `locale_1` se queda: los videos de producto guardan `<video>:<idioma>` (ver
+    // `storedLocale`), así que no chocan con la portada y el código viejo sigue andando.
+    await MktVideoVoiceover.collection.createIndex({ videoId: 1, locale: 1 }, { unique: true }).catch(() => undefined);
+  })();
+  return indexes;
+}

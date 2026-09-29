@@ -116,6 +116,60 @@ export const ADD_IMAGE_TO_LIBRARY_TOOL_SCHEMA: AnthropicTool = {
   },
 };
 
+// Tool interna manejada por el runtime: genera o edita una imagen con un modelo
+// de imagen aparte (imageGeneration.service), la guarda en la librería de la
+// company y la devuelve para que el chat la dibuje. Cada llamada descuenta UNA
+// imagen del cupo mensual del plan (`limits.iaMonthlyImages`).
+export const GENERATE_IMAGE_TOOL_SCHEMA: AnthropicTool = {
+  name: "generate_image",
+  description:
+    "Genera una imagen nueva, o edita una existente, y la guarda en la librería de medios de la empresa. " +
+    "Usala cuando el usuario pida crear, dibujar, diseñar o retocar una imagen (foto de ambientación, " +
+    "publicación para redes, portada del sitio, flyer de una promo, variante de una foto del hotel). " +
+    "Cada llamada consume UNA imagen del cupo mensual del plan: hacé una sola por pedido salvo que el " +
+    "usuario pida explícitamente varias versiones, y no la llames para probar. " +
+    "Para EDITAR, pasá la foto: attachmentIndexes si el usuario la adjuntó en este mensaje, o sourceImageUrls " +
+    "si es una imagen anterior de la conversación o de la librería. " +
+    "La imagen ya se muestra en el chat: no pegues su URL en la respuesta, contá en una línea qué hiciste.",
+  input_schema: {
+    type: "object",
+    properties: {
+      prompt: {
+        type: "string",
+        description:
+          "Descripción detallada de la imagen: sujeto, encuadre, luz, estilo y ambiente. Incluí los datos reales " +
+          "del alojamiento que correspondan (ciudad, paisaje, tipo de propiedad). Para una edición, describí sólo " +
+          "el cambio pedido. Si la imagen debe llevar texto, escribilo literal entre comillas.",
+      },
+      aspectRatio: {
+        type: "string",
+        enum: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
+        description:
+          "Proporción. 1:1 publicación de feed, 9:16 historia/reel, 16:9 portada o banner del sitio, 4:3 foto de " +
+          "habitación. Si es una edición, usá la de la foto original.",
+      },
+      attachmentIndexes: {
+        type: "array",
+        items: { type: "number" },
+        description:
+          "Índices (base 0) de imágenes adjuntas en ESTE mensaje para editar o usar de referencia. Máximo 3.",
+      },
+      sourceImageUrls: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "URLs de imágenes ya existentes (generadas antes en esta conversación o de la librería) para editar o " +
+          "usar de referencia. Máximo 3.",
+      },
+      name: {
+        type: "string",
+        description: "Nombre corto para el archivo en la librería (ej. 'Portada primavera').",
+      },
+    },
+    required: ["prompt", "aspectRatio"],
+  },
+};
+
 // Tool interna manejada por el runtime: NIVEL 2 de la revelación progresiva
 // (§19). El prompt lista las habilidades disponibles con una línea cada una; el
 // cuerpo completo — el instructivo — se paga sólo cuando el modelo decide que lo

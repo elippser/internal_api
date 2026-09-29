@@ -123,7 +123,72 @@ interface SelectedPlanSnapshot {
   planId?: string;
   name?: string;
   productKeys?: string[];
-  limits?: { iaMonthlyCredits?: number | null; iaResetDayUTC?: number | null };
+  limits?: {
+    iaMonthlyCredits?: number | null;
+    iaResetDayUTC?: number | null;
+    iaMonthlyImages?: number | null;
+  };
+}
+
+export type ImageQuotaReason = "ok" | "no_plan" | "ia_not_in_plan" | "no_images" | "enforcement_off";
+
+/** Cupo de imágenes de Roombir IA del período vigente. */
+export interface CompanyImageQuota {
+  companyId: string;
+  allowed: boolean;
+  reason: ImageQuotaReason;
+  monthlyImages: number;
+  used: number;
+  remaining: number;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+  planName: string | null;
+  message: string;
+}
+
+// Mensaje para el usuario (lo repite el modelo en el chat) según el motivo.
+function imageQuotaMessage(q: CompanyImageQuota): string {
+  switch (q.reason) {
+    case "no_plan":
+      return "Esta cuenta todavía no tiene un plan asignado. Elegí un plan para generar imágenes con Roombir IA.";
+    case "ia_not_in_plan":
+      return "El plan de esta cuenta no incluye Roombir IA.";
+    case "no_images": {
+      if (q.monthlyImages === 0) {
+        return `El plan ${q.planName ?? "actual"} no incluye generación de imágenes. Cambiá de plan para habilitarla.`;
+      }
+      const reset = q.periodEnd
+        ? new Date(q.periodEnd).toLocaleDateString("es-AR", { timeZone: "UTC" })
+        : "el próximo período";
+      return `Se usaron las ${q.monthlyImages} imágenes del período. El cupo se renueva el ${reset}.`;
+    }
+    default:
+      return "";
+  }
+}
+
+/**
+ * El plan de la company: snapshot (entitlement) + plan vivo (cupos). Misma
+ * regla que los créditos de texto — ver el comentario de arriba del archivo.
+ */
+async function resolveCompanyPlan(companyId: string) {
+  const Company = await getCompanyModel();
+  const doc = (await Company.collection.findOne(
+    { companyId },
+    { projection: { selectedPlan: 1 } },
+  )) as { selectedPlan?: SelectedPlanSnapshot } | null;
+  const snapshot = doc?.selectedPlan;
+  if (!snapshot?.planId) return null;
+  const plan = await Plan.findOne({ planId: snapshot.planId }).lean();
+  const productKeys = snapshot.productKeys?.length
+    ? snapshot.productKeys
+    : (plan?.productKeys ?? []);
+  return {
+    snapshot,
+    plan,
+    planName: plan?.name ?? snapshot.name ?? null,
+    iaIncluded: includesIaProduct(productKeys),
+  };
 }
 
 export const planCreditsService = {
@@ -245,6 +310,64 @@ export const planCreditsService = {
       allowed: !credits.blocked,
       message: credits.blocked ? creditsMessage(credits) : "",
     };
+  },
+
+  /**
+   * Cupo de imágenes del período vigente. Una imagen consumida = una fila de
+   * `image_generation` en el ledger de uso. Respeta el flag de enforcement: en
+   * local (`IA_CREDITS_ENFORCEMENT=off`) informa el uso pero no bloquea.
+   */
+  async checkImageQuota(companyId: string): Promise<CompanyImageQuota> {
+    const base: CompanyImageQuota = {
+      companyId,
+      allowed: false,
+      reason: "no_plan",
+      monthlyImages: 0,
+      used: 0,
+      remaining: 0,
+      periodStart: null,
+      periodEnd: null,
+      planName: null,
+      message: "",
+    };
+    const resolved = companyId ? await resolveCompanyPlan(companyId) : null;
+
+    let quota: CompanyImageQuota;
+    if (!resolved) {
+      quota = base;
+    } else if (!resolved.iaIncluded) {
+      quota = { ...base, reason: "ia_not_in_plan", planName: resolved.planName };
+    } else {
+      const { plan, snapshot } = resolved;
+      const monthlyImages =
+        plan?.limits?.iaMonthlyImages ?? snapshot.limits?.iaMonthlyImages ?? 0;
+      const resetDay =
+        plan?.limits?.iaResetDayUTC ?? snapshot.limits?.iaResetDayUTC ?? 1;
+      const { start, end } = currentPeriod(resetDay);
+      const used = await usageService.countRecords(
+        companyId,
+        "image_generation",
+        start,
+        new Date(),
+      );
+      const blocked = used >= monthlyImages;
+      quota = {
+        ...base,
+        allowed: !blocked,
+        reason: blocked ? "no_images" : "ok",
+        monthlyImages,
+        used,
+        remaining: Math.max(0, monthlyImages - used),
+        periodStart: start,
+        periodEnd: end,
+        planName: resolved.planName,
+      };
+    }
+
+    if (!iaEnforcementOn()) {
+      return { ...quota, allowed: true, reason: "enforcement_off", message: "" };
+    }
+    return { ...quota, message: quota.allowed ? "" : imageQuotaMessage(quota) };
   },
 
   /** Balance de varias companies (dashboard del plan en el panel interno). */

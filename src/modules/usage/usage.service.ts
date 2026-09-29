@@ -26,6 +26,11 @@ export interface RecordUsageInput {
   latencyMs?: number;
   toolCallCount?: number;
   occurredAt?: Date | string | null;
+  /**
+   * Costo ya conocido. Para lo que no se factura por token (una imagen) la
+   * tabla de precios no sirve: OpenRouter informa el costo real y se usa ese.
+   */
+  costUsd?: number;
 }
 
 interface DateRange {
@@ -114,12 +119,15 @@ export const usageService = {
     const cacheReadTokens = input.cacheReadTokens ?? 0;
     const totalTokens =
       inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens;
-    const costUsd = computeCostUsd(input.model, {
-      inputTokens,
-      outputTokens,
-      cacheCreationTokens,
-      cacheReadTokens,
-    });
+    const costUsd =
+      typeof input.costUsd === "number"
+        ? input.costUsd
+        : computeCostUsd(input.model, {
+            inputTokens,
+            outputTokens,
+            cacheCreationTokens,
+            cacheReadTokens,
+          });
     const occurredAt = input.occurredAt
       ? new Date(input.occurredAt)
       : new Date();
@@ -197,6 +205,25 @@ export const usageService = {
       { $group: { _id: null, total: { $sum: "$totalTokens" } } },
     ]);
     return agg?.total ?? 0;
+  },
+
+  /**
+   * Cuántas filas de un source tiene una company en el rango. Lo usa el cupo de
+   * imágenes: una fila de `image_generation` es una imagen. Lee el ledger
+   * crudo y no el rollup porque el período arranca a una hora exacta y el
+   * rollup es por día (hay índice companyId + source + occurredAt).
+   */
+  async countRecords(
+    companyId: string,
+    source: UsageSource,
+    dateFrom: Date,
+    dateTo: Date,
+  ): Promise<number> {
+    return UsageRecord.countDocuments({
+      companyId,
+      source,
+      occurredAt: { $gte: dateFrom, $lte: dateTo },
+    });
   },
 
   /** Totales globales (o de una company) en el rango. */

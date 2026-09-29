@@ -12,6 +12,7 @@ import {
 import {
   ADD_IMAGE_TO_LIBRARY_TOOL_SCHEMA,
   CAPTURE_FEEDBACK_TOOL_SCHEMA,
+  GENERATE_IMAGE_TOOL_SCHEMA,
   LOAD_SKILL_TOOL_SCHEMA,
   executeTool,
   resolveTools,
@@ -45,12 +46,21 @@ import {
 } from "../../tourism/tourismTurn";
 import { checkToolCall } from "./toolAccess";
 import { evaluateAccess } from "../../../shared/agentAuth/routePolicy";
-import type { UserScope } from "../../../shared/agentAuth/userScope";
+import { resolveUserScope, type UserScope } from "../../../shared/agentAuth/userScope";
 import { pmsRequest, PmsProxyError } from "../../../shared/middleware/pmsProxy";
 import { mintAgentJwt } from "../../../shared/agentAuth/agentJwt";
 import { confirmationFor } from "./confirmationPolicy";
 import { normalizeToolSchema } from "../../../shared/llm/toolSchema";
 import { randomUUID } from "crypto";
+import {
+  generateImage,
+  ImageGenerationError,
+  isImageAspectRatio,
+  type ImageAspectRatio,
+  type ReferenceImage,
+} from "./imageGeneration.service";
+import { planCreditsService } from "../../plans/planCredits.service";
+import { usageService } from "../../usage/usage.service";
 
 /**
  * Cuánto vive una confirmación pendiente. Corta pero no molesta: si el usuario
@@ -249,6 +259,12 @@ export interface StepEvent {
   toolName: string;
   label: string;
   status?: "ok" | "error";
+  /**
+   * Datos para que el cliente dibuje el paso mientras corre. Hoy sólo
+   * `generate_image` lo usa: manda la proporción para que el loader ocupe el
+   * mismo lugar que después ocupa la imagen, sin salto al llegar.
+   */
+  detail?: Record<string, unknown>;
 }
 
 // Ítem de la transcripción del turno, en el orden en que ocurrió: cada texto
@@ -287,6 +303,7 @@ const INTERNAL_TOOL_NAMES = new Set([
   "load_skill",
   "capture_feedback_request",
   "add_image_to_library",
+  "generate_image",
   PROPOSE_GROWTH_PLAN,
   CONSULTAR_ESTADO_TURISTICO,
 ]);
@@ -314,6 +331,7 @@ function stepLabelForTool(toolName: string): string {
   if (n === PROPOSE_GROWTH_PLAN) return "Armando el plan…";
   if (n === CONSULTAR_ESTADO_TURISTICO || n === TOURISM_STATUS_BLOCK) return TOURISM_STEP_LABEL;
   if (n === "add_image_to_library") return "Guardando en la librería…";
+  if (n === "generate_image") return "Generando la imagen…";
   if (n === "load_skill") return "Repasando el procedimiento…";
   // Las crudas primero: `write_booking_api` matcheaba /booking/ más abajo y el
   // usuario veía "Buscando reservas…" mientras el agente intentaba cambiar la
@@ -503,6 +521,15 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   if (hasImageAttachment) {
     tools.push(ADD_IMAGE_TO_LIBRARY_TOOL_SCHEMA);
   }
+  // Generar imágenes: en cualquier turno con usuario, menos el estratégico y el
+  // turístico (tienen su propia respuesta armada). Se ofrece aunque el plan no
+  // tenga cupo: así el modelo puede contestar "tu plan no incluye imágenes" en
+  // vez de decir que no sabe dibujar.
+  if (session.context.userId && !input.planContext && profile.id !== "turistico") {
+    tools.push(GENERATE_IMAGE_TOOL_SCHEMA);
+  }
+  // Cuántas imágenes generó este turno (tope por turno, ver handleGenerateImage).
+  const imageTurn = { count: 0 };
   // Sin habilidades visibles la tool no tiene nada que cargar: ofrecerla igual
   // sólo invita al modelo a llamarla y recibir un error.
   if (input.hasSkills) {
@@ -871,7 +898,14 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
 
     const runOne = async (block: any) => {
       const label = stepLabelForTool(block.name);
-      input.onStep?.({ kind: "tool_start", toolName: block.name, label });
+      input.onStep?.({
+        kind: "tool_start",
+        toolName: block.name,
+        label,
+        ...(block.name === "generate_image"
+          ? { detail: { aspectRatio: block.input?.aspectRatio ?? "1:1" } }
+          : {}),
+      });
       const handled = await handleToolCall(
         block,
         agent,
@@ -883,13 +917,21 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
           scope: input.scope ?? null,
           planContext: input.planContext,
           tourismTool: input.tourismTool,
+          imageTurn,
         },
       );
+      // La imagen generada viaja ya en el tool_done: el chat la revela apenas
+      // está, mientras el modelo todavía escribe su línea de cierre.
+      const imageCard =
+        block.name === "generate_image" && handled.execMeta.outcome === "success"
+          ? (handled.execMeta.result as Record<string, unknown> | undefined)
+          : undefined;
       input.onStep?.({
         kind: "tool_done",
         toolName: block.name,
         label,
         status: handled.execMeta.outcome === "success" ? "ok" : "error",
+        ...(imageCard ? { detail: imageCard } : {}),
       });
       return { block, label, handled };
     };
@@ -1095,6 +1137,7 @@ interface ToolCallExtras {
   scope?: UserScope | null;
   planContext?: PlanToolContext;
   tourismTool?: TourismToolContext;
+  imageTurn?: { count: number };
 }
 
 async function handleToolCall(
@@ -1110,6 +1153,11 @@ async function handleToolCall(
   // ---- Tool interna: add_image_to_library ----
   if (block.name === "add_image_to_library") {
     return handleAddImageToLibrary(block, agent, session, extras);
+  }
+
+  // ---- Tool interna: generate_image ----
+  if (block.name === "generate_image") {
+    return handleGenerateImage(block, agent, session, extras);
   }
 
   // ---- Tool interna: propose_growth_plan (turno estratégico) ----
@@ -1644,6 +1692,216 @@ async function handleAddImageToLibrary(
       output: { error: true, message: friendly },
       execMeta: mk("error", undefined, `library_error: ${msg}`),
     };
+  }
+}
+
+/**
+ * Tope de imágenes por turno, además del cupo mensual. Un turno que encadena
+ * "hacé cinco variantes" y después reintenta cada una se come el mes entero en
+ * un minuto; cuatro alcanza para "dame opciones" y frena un loop.
+ */
+const MAX_IMAGES_PER_TURN = 4;
+/** Fotos de referencia por imagen: más que esto no mejora la edición y pesa. */
+const MAX_IMAGE_REFERENCES = 3;
+
+// Tool interna: genera (o edita) una imagen con el modelo de imagen, la guarda
+// en la librería de la company y la devuelve para la tarjeta del chat.
+//
+// Orden deliberado: permisos → tope del turno → cupo del plan → generar →
+// registrar el consumo → subir. Todo lo que puede decir "no" va ANTES de
+// generar, porque generar es lo único que cuesta plata. El consumo se registra
+// apenas hay imagen, aunque la subida falle después: la imagen ya se pagó.
+async function handleGenerateImage(
+  block: any,
+  agent: AgentLike,
+  session: SessionLike,
+  extras: ToolCallExtras,
+): Promise<ToolHandleResult> {
+  const start = Date.now();
+  const input = (block.input ?? {}) as Record<string, unknown>;
+  const mk = (
+    outcome: ToolExecutionMeta["outcome"],
+    result?: unknown,
+    errorMessage?: string,
+  ): ToolExecutionMeta => ({
+    toolId: "internal-image",
+    toolName: "generate_image",
+    inputArgs: input,
+    outcome,
+    result,
+    errorMessage,
+    durationMs: Date.now() - start,
+    retried: false,
+  });
+  const fail = (message: string, reason: string, code?: string): ToolHandleResult => ({
+    output: { error: true, ...(code ? { code } : {}), message },
+    execMeta: mk("error", undefined, reason),
+  });
+
+  const prompt = typeof input.prompt === "string" ? input.prompt.trim() : "";
+  if (!prompt) return fail("Falta la descripción de la imagen (prompt).", "empty_prompt");
+  const aspectRatio: ImageAspectRatio = isImageAspectRatio(input.aspectRatio)
+    ? input.aspectRatio
+    : "1:1";
+
+  const { userId, companyId, propertyId } = session.context;
+  if (!userId || !companyId) {
+    return fail("No puedo identificar al usuario para generar la imagen.", "no_user");
+  }
+
+  // La imagen vive en la librería: sin permiso de escritura ahí no hay dónde
+  // guardarla, y generarla igual sería pagar por algo que se tira.
+  if (extras.scope) {
+    // El perfil se lee UNA vez al arrancar el turno y un fallo queda en caché
+    // 10 s. Si el PMS tardó justo en ese momento (visto el 25-09: :9090 no
+    // contestó en 4 s), el usuario recibía "reintentá" aunque el PMS ya
+    // estuviera sano. Se relee una vez, forzando, antes de rendirse.
+    let scope = extras.scope;
+    if (!scope.resolved && process.env.AGENT_JWT_SECRET) {
+      scope = await resolveUserScope(process.env.AGENT_JWT_SECRET, userId, companyId, { force: true });
+    }
+    const access = evaluateAccess(scope, {
+      service: "pms-core",
+      method: "POST",
+      path: "/asset-library/files/upload-base64",
+    });
+    if (!access.allowed) {
+      return fail(
+        access.message ?? "No tenés permiso para guardar archivos en la librería, que es donde queda la imagen.",
+        `${access.code}: ${access.reason}`,
+        access.code,
+      );
+    }
+  }
+
+  const turn = extras.imageTurn ?? { count: 0 };
+  if (turn.count >= MAX_IMAGES_PER_TURN) {
+    return fail(
+      `Ya generé ${MAX_IMAGES_PER_TURN} imágenes en este mensaje. Mostrale estas al usuario y, si quiere más, que lo pida en otro mensaje.`,
+      "turn_cap",
+      "image_turn_cap",
+    );
+  }
+
+  const quota = await planCreditsService.checkImageQuota(companyId);
+  if (!quota.allowed) {
+    return fail(quota.message, `image_quota: ${quota.reason}`, "image_quota_exceeded");
+  }
+
+  // Referencias: adjuntos de este turno y URLs de imágenes anteriores.
+  const references: ReferenceImage[] = [];
+  const idxs = Array.isArray(input.attachmentIndexes) ? input.attachmentIndexes : [];
+  for (const raw of idxs) {
+    const att = extras.attachments[Number(raw)];
+    if (att?.kind === "image") {
+      references.push({ mediaType: att.mediaType, dataB64: att.dataB64 });
+    }
+  }
+  const urls = Array.isArray(input.sourceImageUrls) ? input.sourceImageUrls : [];
+  for (const u of urls) {
+    // Sólo https: un data: o un http interno no tienen por qué salir de acá.
+    if (typeof u === "string" && /^https:\/\//i.test(u.trim())) {
+      references.push({ mediaType: "image/jpeg", url: u.trim() });
+    }
+  }
+  if (idxs.length + urls.length > 0 && references.length === 0) {
+    return fail(
+      "No encontré la imagen a editar: no hay una imagen adjunta en esa posición ni una URL https válida.",
+      "reference_not_found",
+    );
+  }
+  references.splice(MAX_IMAGE_REFERENCES);
+
+  turn.count += 1;
+  let image;
+  try {
+    image = await generateImage({ prompt, aspectRatio, references });
+  } catch (err) {
+    // No se descuenta: sin imagen no hubo consumo que cobrar.
+    turn.count -= 1;
+    const e = err instanceof ImageGenerationError ? err : null;
+    const message =
+      e?.code === "refused"
+        ? `El modelo de imágenes no generó esta imagen (${e.message}). Probá reformular el pedido.`
+        : `No pude generar la imagen: ${e?.message ?? "error desconocido"}. Intentá de nuevo en un momento.`;
+    return fail(message, `image_error: ${(err as Error)?.message}`, e?.code ?? "image_error");
+  }
+
+  try {
+    await usageService.record({
+      source: "image_generation",
+      agentId: agent.agentId,
+      model: image.model,
+      companyId,
+      propertyId: propertyId ?? null,
+      userId,
+      userRole: session.context.userRole ?? null,
+      conversationId: session.sessionId,
+      sessionId: session.sessionId,
+      // Tokens en cero a propósito: la imagen tiene su propio cupo y no debe
+      // descontar del de texto. El costo real va en costUsd.
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: image.costUsd,
+      latencyMs: image.ms,
+      toolCallCount: 1,
+      occurredAt: new Date(),
+    });
+  } catch (err) {
+    console.error("[usage] no se pudo registrar la imagen generada:", err);
+  }
+
+  const name =
+    (typeof input.name === "string" && input.name.trim()) ||
+    `Roombir IA · ${prompt.slice(0, 48)}`;
+  try {
+    const agentJwt = await mintAgentJwt({
+      userId,
+      companyId,
+      agentId: agent.agentId,
+      sessionId: session.sessionId,
+    });
+    const uploaded = (await pmsRequest({
+      service: "pms-core",
+      method: "POST",
+      path: "/asset-library/files/upload-base64",
+      body: { dataB64: image.dataB64, mediaType: image.mediaType, name },
+      agentJwt,
+    })) as any;
+    const file = uploaded?.file ?? uploaded;
+    const url: string | undefined = file?.url;
+    if (!url) {
+      return fail("La librería no devolvió la URL de la imagen generada.", "no_url");
+    }
+
+    const remaining = Math.max(0, quota.remaining - 1);
+    const card = {
+      kind: "generated_image",
+      url,
+      fileId: file?.fileId ?? null,
+      name,
+      prompt,
+      aspectRatio,
+      width: typeof file?.width === "number" ? file.width : null,
+      height: typeof file?.height === "number" ? file.height : null,
+      edited: references.length > 0,
+      remaining: quota.reason === "enforcement_off" ? null : remaining,
+      monthlyImages: quota.reason === "enforcement_off" ? null : quota.monthlyImages,
+    };
+    return {
+      output: {
+        ok: true,
+        url,
+        fileId: card.fileId,
+        imagesLeftThisPeriod: card.remaining,
+        message:
+          "Imagen generada, guardada en la librería y ya visible en el chat. No repitas la URL: describí en una línea qué hiciste.",
+      },
+      execMeta: mk("success", card),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return fail(`Generé la imagen pero no pude guardarla en la librería: ${msg}`, `library_error: ${msg}`);
   }
 }
 

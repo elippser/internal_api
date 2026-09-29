@@ -1,3 +1,4 @@
+import { createReadStream } from "node:fs";
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Router, type Response } from "express";
@@ -7,7 +8,9 @@ import { authenticate } from "../../shared/middleware/authenticate";
 import { authorize } from "../../shared/middleware/authorize";
 import { fail, ok } from "../../shared/utils/http";
 import { env, PROJECT_DIR } from "../mktproject/mktproject.service";
-import { MktVideoVoiceover } from "./mktvideo.model";
+import { MktVideoVoiceover, ensureVideoIndexes } from "./mktvideo.model";
+import { LOCALES as LOCS, VIDEOS, montajeFilter, storedLocale, videoDef, videoPath } from "./mktvideo.catalog";
+import { cancelExport, getJob, lastJob, publicJob, startExport } from "./mktvideo.export";
 
 /**
  * El modulo Videos del panel: el montaje de la voz en off del video de portada,
@@ -26,8 +29,10 @@ import { MktVideoVoiceover } from "./mktvideo.model";
 export const mktvideoRouter = Router();
 
 mktvideoRouter.use(authenticate);
+// Una vez por proceso: el índice viejo de un solo video (`locale` único) no deja montar otro video en el mismo idioma.
+mktvideoRouter.use((_req, _res, next) => void ensureVideoIndexes().then(() => next(), () => next()));
 
-const LOCALES = ["es", "en", "pt", "fr", "de"];
+const LOCALES: string[] = [...LOCS];
 /** Donde viven los audios, dentro del repo del renderer. */
 const AUDIO_DIR = path.join(PROJECT_DIR, "public", "audio");
 /** La ruta publica con la que el renderer los sirve. */
@@ -83,37 +88,37 @@ function safeName(original: string, ext: string): string {
  */
 mktvideoRouter.get("/", authorize("analyst"), async (_req, res) => {
   try {
-    const docs = await MktVideoVoiceover.find({ locale: { $in: LOCALES } }).lean();
-    const porIdioma = new Map(docs.map((d) => [d.locale, d]));
+    const docs = await MktVideoVoiceover.find({}).lean();
+    // La portada guarda el idioma pelado; los demás, `<video>:<idioma>` (ver storedLocale).
+    const porClave = new Map(docs.map((d: any) => [String(d.locale).includes(":") ? d.locale : `portada:${d.locale}`, d]));
+    const clave = (videoId: string, locale: string) => `${videoId}:${locale}`;
 
-    const data = LOCALES.map((locale) => {
-      const d = porIdioma.get(locale);
-      const tracks = d?.tracks ?? [];
-      const clips = tracks.reduce((a, t) => a + (t.clips?.length ?? 0), 0);
-      const audios = tracks.reduce(
-        (a, t) => a + (t.clips ?? []).filter((c: any) => c.kind === "audio").length,
-        0,
-      );
-      // El largo del montaje: la pista mas larga.
-      const montajeMs = tracks.reduce(
-        (max, t) => Math.max(max, (t.clips ?? []).reduce((a: number, c: any) => a + c.dur, 0)),
-        0,
-      );
-      return {
-        videoId: "portada",
-        title: "Video de portada",
-        locale,
-        tracks: tracks.length,
-        clips,
-        audios,
-        montajeMs,
-        videoMs: d?.videoMs ?? 0,
-        scenes: d?.scenes ? Object.keys(d.scenes).length : 0,
-        updatedAt: d ? (d as any).updatedAt : null,
-      };
-    });
+    // Un renglón por video y por idioma; el panel los agrupa por video.
+    const data = VIDEOS.flatMap((v) =>
+      LOCALES.map((locale) => {
+        const d: any = porClave.get(clave(v.id, locale));
+        const tracks = d?.tracks ?? [];
+        const clips = tracks.reduce((a: number, t: any) => a + (t.clips?.length ?? 0), 0);
+        const audios = tracks.reduce((a: number, t: any) => a + (t.clips ?? []).filter((c: any) => c.kind === "audio").length, 0);
+        // El largo del montaje: la pista más larga.
+        const montajeMs = tracks.reduce((max: number, t: any) => Math.max(max, (t.clips ?? []).reduce((a: number, c: any) => a + c.dur, 0)), 0);
+        return {
+          videoId: v.id,
+          title: v.title,
+          locale,
+          path: videoPath(v.id, locale),
+          tracks: tracks.length,
+          clips,
+          audios,
+          montajeMs,
+          videoMs: d?.videoMs ?? 0,
+          scenes: d?.scenes ? Object.keys(d.scenes).length : 0,
+          updatedAt: d ? d.updatedAt : null,
+        };
+      }),
+    );
 
-    return ok(res, { data, rendererUrl: env("MKT_RENDERER_URL", "http://localhost:6300") });
+    return ok(res, { data, videos: VIDEOS.map(({ id, title }) => ({ id, title })), rendererUrl: env("MKT_RENDERER_URL", "http://localhost:6300") });
   } catch (err) {
     return handleErr(res, err);
   }
@@ -174,6 +179,72 @@ mktvideoRouter.post("/audio", authorize("developer"), upload.single("file"), asy
 });
 
 // ---------------------------------------------------------------------------
+// Exportar a MP4
+// ---------------------------------------------------------------------------
+
+/**
+ * Exportar el video de un idioma a un MP4 con su audio (ver `mktvideo.export.ts`).
+ * Arrancar devuelve el trabajo enseguida; el editor lo consulta cada segundo y,
+ * cuando termina, baja el archivo por `/exports/:id/file` con el mismo token.
+ */
+mktvideoRouter.get("/exports/:id", authorize("analyst"), (req, res) => {
+  const job = getJob(String(req.params.id));
+  if (!job) return fail(res, 404, "No existe esa exportación", "export_not_found");
+  return ok(res, publicJob(job));
+});
+
+mktvideoRouter.get("/exports/:id/file", authorize("analyst"), async (req, res) => {
+  const job = getJob(String(req.params.id));
+  if (!job?.file || job.phase !== "done") return fail(res, 404, "La exportación no tiene archivo", "export_not_ready");
+  try {
+    const st = await stat(job.file);
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", String(st.size));
+    res.setHeader("Content-Disposition", `attachment; filename="${path.basename(job.file)}"`);
+    res.setHeader("Cache-Control", "no-store");
+    createReadStream(job.file).pipe(res);
+  } catch (err) {
+    return handleErr(res, err);
+  }
+});
+
+mktvideoRouter.delete("/exports/:id", authorize("developer"), (req, res) => {
+  const job = cancelExport(String(req.params.id));
+  if (!job) return fail(res, 404, "No existe esa exportación", "export_not_found");
+  return ok(res, publicJob(job));
+});
+
+/** Valida video + idioma. Devuelve el error ya respondido, o null. */
+function params(req: any, res: Response): { video: string; locale: string } | null {
+  const video = String(req.params.video ?? "portada");
+  const locale = String(req.params.locale);
+  if (!videoDef(video)) {
+    fail(res, 404, "Video desconocido", "invalid_video");
+    return null;
+  }
+  if (!LOCALES.includes(locale)) {
+    fail(res, 400, "Idioma desconocido", "invalid_locale");
+    return null;
+  }
+  return { video, locale };
+}
+
+// La exportación a MP4 es sólo del video de portada (pedido del usuario: los videos de producto no se exportan).
+mktvideoRouter.get("/:locale/export", authorize("analyst"), (req, res) => {
+  const locale = String(req.params.locale);
+  if (!LOCALES.includes(locale)) return fail(res, 400, "Idioma desconocido", "invalid_locale");
+  const job = lastJob(locale);
+  return ok(res, { job: job ? publicJob(job) : null });
+});
+
+mktvideoRouter.post("/:locale/export", authorize("developer"), (req, res) => {
+  const locale = String(req.params.locale);
+  if (!LOCALES.includes(locale)) return fail(res, 400, "Idioma desconocido", "invalid_locale");
+  // Sin opciones: siempre 1920 × 1080 a 60 cuadros (ver `EXPORT_FPS`).
+  return ok(res, publicJob(startExport(locale)), 202);
+});
+
+// ---------------------------------------------------------------------------
 // El montaje de un idioma
 // ---------------------------------------------------------------------------
 
@@ -227,38 +298,42 @@ const respuesta = (locale: string, doc: any) => ({
   updatedAt: doc ? doc.updatedAt : null,
 });
 
-mktvideoRouter.get("/:locale", authorize("analyst"), async (req, res) => {
-  const locale = String(req.params.locale);
-  if (!LOCALES.includes(locale)) return fail(res, 400, "Idioma desconocido", "invalid_locale");
+const leer = async (req: any, res: Response) => {
+  const p = params(req, res);
+  if (!p) return;
   try {
-    return ok(res, respuesta(locale, await MktVideoVoiceover.findOne({ locale }).lean()));
+    return ok(res, respuesta(p.locale, await MktVideoVoiceover.findOne(montajeFilter(p.video, p.locale)).lean()));
   } catch (err) {
     return handleErr(res, err);
   }
-});
+};
 
-mktvideoRouter.put("/:locale", authorize("developer"), async (req, res) => {
-  const locale = String(req.params.locale);
-  if (!LOCALES.includes(locale)) return fail(res, 400, "Idioma desconocido", "invalid_locale");
-
+const guardar = async (req: any, res: Response) => {
+  const p = params(req, res);
+  if (!p) return;
   const { error, value } = bodySchema.validate(req.body, { stripUnknown: true });
   if (error) return fail(res, 400, error.message, "invalid_body");
-
+  const filtro = montajeFilter(p.video, p.locale);
   try {
     if (value.expectedUpdatedAt) {
-      const actual = await MktVideoVoiceover.findOne({ locale }).lean();
+      const actual = await MktVideoVoiceover.findOne(filtro).lean();
       const sello = actual ? new Date((actual as any).updatedAt).toISOString() : null;
       if (sello && sello !== new Date(value.expectedUpdatedAt).toISOString()) {
         return fail(res, 409, "El montaje cambio desde que se abrio", "stale_write");
       }
     }
     const doc = await MktVideoVoiceover.findOneAndUpdate(
-      { locale },
-      { $set: { tracks: value.tracks, scenes: value.scenes, videoMs: value.videoMs } },
+      filtro,
+      { $set: { videoId: p.video, locale: storedLocale(p.video, p.locale), tracks: value.tracks, scenes: value.scenes, videoMs: value.videoMs } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ).lean();
-    return ok(res, respuesta(locale, doc));
+    return ok(res, respuesta(p.locale, doc));
   } catch (err) {
     return handleErr(res, err);
   }
-});
+};
+
+mktvideoRouter.get("/:locale", authorize("analyst"), leer);
+mktvideoRouter.put("/:locale", authorize("developer"), guardar);
+mktvideoRouter.get("/:video/:locale", authorize("analyst"), leer);
+mktvideoRouter.put("/:video/:locale", authorize("developer"), guardar);

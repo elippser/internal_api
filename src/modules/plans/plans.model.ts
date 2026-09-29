@@ -93,6 +93,13 @@ const limitsSchema = new Schema(
     // Dia del mes (UTC) en que se renueva el cupo. 1 = mes calendario. Se topea
     // en 28 para que todos los meses tengan ese dia.
     iaResetDayUTC: { type: Number, default: 1, min: 1, max: 28 },
+    // Imagenes que Roombir IA puede generar o editar por mes (tool
+    // `generate_image`). Es un cupo APARTE de los tokens: una imagen cuesta
+    // ~USD 0,034 y no se parece en nada al costo de un turno de texto, asi que
+    // medirla en tokens la haria invisible. Comparte el dia de reset de arriba.
+    // `null` = sin asignar = 0: un plan viejo no genera imagenes hasta que
+    // alguien le ponga un numero.
+    iaMonthlyImages: { type: Number, default: null },
   },
   { _id: false },
 );
