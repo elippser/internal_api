@@ -239,7 +239,7 @@ ${steps(copy.steps)}
     "",
     url,
     "",
-    `${copy.stepsTitle}:`,
+    `${copy.stepsTitle}${locale === "fr" ? " :" : ":"}`,
     ...copy.steps.map((s, i) => `${i + 1}. ${s}`),
     "",
     copy.expiry(days, formatDate(view.expiresAt, locale)),

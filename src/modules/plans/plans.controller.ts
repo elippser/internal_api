@@ -276,6 +276,7 @@ export const publicPlansController = {
         name: p.name,
         tagline: p.tagline,
         description: p.description,
+        i18n: p.i18n,
         price: p.price,
         free: p.free,
         freeDurationDays: p.freeDurationDays,

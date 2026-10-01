@@ -285,6 +285,7 @@ export const plansService = {
       name: plan.name,
       tagline: plan.tagline ?? "",
       description: plan.description ?? "",
+      i18n: (plan as any).i18n ?? {},
       price: plan.price ?? { amount: 0, currency: "USD", period: "monthly" },
       free: Boolean(plan.free),
       freeDurationDays: plan.freeDurationDays ?? null,

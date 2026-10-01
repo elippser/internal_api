@@ -78,6 +78,15 @@ const planBody = {
   slug: KEY,
   tagline: Joi.string().allow("").max(200),
   description: Joi.string().allow("").max(4000),
+  i18n: Joi.object()
+    .pattern(
+      Joi.string().valid("en", "fr", "de", "pt"),
+      Joi.object({
+        name: Joi.string().allow("").max(120),
+        tagline: Joi.string().allow("").max(200),
+        description: Joi.string().allow("").max(4000),
+      }),
+    ),
   productKeys: Joi.array().items(Joi.string().trim().min(1).max(48)),
   price: priceSchema,
   free: Joi.boolean(),

@@ -3,6 +3,7 @@ import { authenticate } from "../../shared/middleware/authenticate";
 import { authorize } from "../../shared/middleware/authorize";
 import { accessController } from "./access.controller";
 import { blocksController } from "./blocks.controller";
+import { shieldController } from "./shield.controller";
 
 /**
  * `/api/v1/access/*` — quién entró a roombir, desde dónde y con qué equipo.
@@ -24,6 +25,13 @@ accessRouter.post("/blocks/test", blocksController.test);
 accessRouter.post("/blocks", authorize("admin"), blocksController.create);
 accessRouter.patch("/blocks/:ruleId", authorize("admin"), blocksController.update);
 accessRouter.delete("/blocks/:ruleId", authorize("admin"), blocksController.remove);
+
+// Escudo anti-bot (ANTIBOT-SPEC §7). Leer es analyst; liberar un bloqueo es admin.
+accessRouter.get("/shield/overview", shieldController.overview);
+accessRouter.get("/shield/events", shieldController.events);
+accessRouter.get("/shield/subjects", shieldController.subjects);
+accessRouter.get("/shield/trace/:code", shieldController.trace);
+accessRouter.post("/shield/release", authorize("admin"), shieldController.release);
 
 accessRouter.get("/events", accessController.listEvents);
 accessRouter.get("/events/:eventId", accessController.getEvent);

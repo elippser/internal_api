@@ -67,9 +67,13 @@ const appUrl = () =>
  * por otro lado, y no participan de la autorizacion — quien borre las UTM sigue
  * pudiendo registrarse, quien borre el `inv` no.
  */
-function inviteUrl(token: string): string {
+function inviteUrl(token: string, locale: string): string {
   const params = new URLSearchParams({
     inv: token,
+    // El idioma en que la persona completo el formulario del sitio. El PMS lo
+    // lee en su middleware y abre el alta en ese idioma, en vez de adivinarlo
+    // por el pais de la IP.
+    lang: locale,
     utm_source: "email",
     utm_medium: "invite",
     utm_campaign: "lead_access",
@@ -77,7 +81,7 @@ function inviteUrl(token: string): string {
   return `${appUrl()}/register?${params.toString()}`;
 }
 
-const loginUrl = () => `${appUrl()}/login`;
+const loginUrl = (locale: string) => `${appUrl()}/login?lang=${encodeURIComponent(locale)}`;
 
 // ---------------------------------------------------------------------------
 // Token
@@ -232,7 +236,7 @@ export const leadsService = {
           to: email,
           hotelName,
           locale: base.locale,
-          loginUrl: loginUrl(),
+          loginUrl: loginUrl(base.locale ?? "es"),
         });
       } catch (err) {
         console.error("[leads] no se pudo avisar que ya tenia cuenta:", err);
@@ -317,7 +321,7 @@ export const leadsService = {
         contactName: lead.contactName ?? undefined,
         hotelName: lead.hotelName,
         locale: lead.locale ?? "es",
-        url: inviteUrl(token),
+        url: inviteUrl(token, lead.locale ?? "es"),
         expiresAt,
       });
     } catch (err: any) {

@@ -68,6 +68,8 @@ export const conversationsController = {
         req.params.id,
         value.content,
         value.attachments,
+        undefined,
+        { locale: String(req.headers["accept-language"] ?? "") },
       );
       return ok(res, result);
     } catch (err) {
@@ -110,6 +112,8 @@ export const conversationsController = {
           onTextEnd: () => send("text_end", {}),
           onCard: (block) => send("card", block),
         },
+        // El PMS reenvía el idioma de su interfaz (cookie de idioma).
+        { locale: String(req.headers["accept-language"] ?? "") },
       );
       send("message", result);
       send("done", { ok: true });

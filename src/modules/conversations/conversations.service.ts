@@ -178,6 +178,30 @@ function decodeTextAttachment(a: MessageAttachment): string {
   return text;
 }
 
+/**
+ * El idioma de la interfaz del PMS, por turno. Sin esto el modelo elegía por
+ * su cuenta y con un prompt en castellano arrancaba en castellano ("Consulto
+ * las llegadas de hoy…") aunque la persona le escribiera en francés.
+ */
+const UI_LANGUAGES: Record<string, string> = {
+  es: "castellano",
+  en: "inglés",
+  fr: "francés (tratando de vous)",
+  de: "alemán (tratando de Sie)",
+  pt: "portugués de Brasil (tratando de você)",
+};
+
+function languageBlock(locale?: string): string {
+  const code = (locale ?? "").slice(0, 2).toLowerCase();
+  const name = UI_LANGUAGES[code];
+  if (!name || code === "es") return "";
+  return (
+    "## Idioma de la conversación\n" +
+    `La interfaz del usuario está en ${name}. Respondé SIEMPRE en ese idioma: la respuesta final, los textos intermedios mientras usás herramientas y las preguntas. ` +
+    "Los datos del hotel (nombres, notas) van como estén cargados. Las fechas y horas, en la zona horaria de la propiedad."
+  );
+}
+
 export const conversationsService = {
   async createSession(input: CreateSessionInput) {
     const agent = await resolveAgent(input.agentId);
@@ -256,6 +280,7 @@ export const conversationsService = {
     content: string,
     attachments: MessageAttachment[] = [],
     stream?: TurnStreamHandlers,
+    opts: { locale?: string } = {},
   ) {
     const session = await ConversationSession.findOne({ sessionId });
     if (!session) throw httpError(404, "Sesion no encontrada");
@@ -462,13 +487,18 @@ export const conversationsService = {
     const access = scope
       ? await computeTurnToolAccess(agent.enabledToolIds, scope)
       : { allowedToolIds: agent.enabledToolIds, denied: [], appAccess: [] };
-    const permissionsBlock = scope
-      ? renderPermissionsBlock(scope, access, {
-          propertyId: session.context.propertyId ?? undefined,
-          propertyName: session.context.propertyName ?? undefined,
-          operativeSpaceName: session.context.operativeSpaceName ?? undefined,
-        })
-      : "";
+    const permissionsBlock = [
+      scope
+        ? renderPermissionsBlock(scope, access, {
+            propertyId: session.context.propertyId ?? undefined,
+            propertyName: session.context.propertyName ?? undefined,
+            operativeSpaceName: session.context.operativeSpaceName ?? undefined,
+          })
+        : "",
+      languageBlock(opts.locale),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
     if (scope && access.denied.length) {
       console.log(
         `[conversations] permisos: ${access.allowedToolIds.length} tools ofrecidas, ${access.denied.length} filtradas para ${scope.role ?? "sin-rol"} (${session.context.userId})`,

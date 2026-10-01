@@ -113,6 +113,11 @@ const planSchema = new Schema(
     tagline: { type: String, default: "" },
     description: { type: String, default: "" },
 
+    // Nombre, tagline y descripcion en los otros idiomas de la plataforma
+    // (en, fr, de, pt). Los campos de arriba son el castellano y el respaldo:
+    // un idioma sin cargar, o un campo vacio, cae a ellos.
+    i18n: { type: Schema.Types.Mixed, default: () => ({}) },
+
     // Los productos incluidos, por `key`. Se guardan por key y no por id para
     // que el snapshot que viaja a la company siga siendo legible.
     productKeys: { type: [String], default: [] },
