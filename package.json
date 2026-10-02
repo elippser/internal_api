@@ -13,6 +13,9 @@
     "seed:plans": "ts-node src/scripts/seedPlans.ts",
     "purge:seeded-analytics": "ts-node src/scripts/purgeSeededAnalytics.ts",
     "smoke:metrics": "ts-node --transpile-only src/scripts/smokeMetrics.ts",
+    "smoke:usability-ingest": "ts-node --transpile-only src/scripts/smokeUsabilityIngest.ts",
+    "smoke:usability-rollup": "ts-node --transpile-only src/scripts/smokeUsabilityRollup.ts",
+    "smoke:usability-ia": "ts-node --transpile-only src/scripts/smokeUsabilityIa.ts",
     "seed:feedback": "ts-node src/scripts/seedFeedback.ts",
     "seed:conversations": "ts-node src/scripts/seedConversations.ts",
     "seed:editor-agent": "ts-node src/scripts/seedEditorAgent.ts",
@@ -122,6 +125,7 @@
     "@types/pdf-parse": "^1.1.4",
     "@types/uuid": "^9.0.8",
     "@types/ws": "^8.18.1",
+    "mongodb-memory-server": "^10.4.3",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.4"

@@ -1,11 +1,21 @@
 import type { Request, Response } from "express";
 import { fail, ok, paginated, parsePagination } from "../../shared/utils/http";
-import { usersService } from "./users.service";
+import { usersService, type Actor } from "./users.service";
 import {
   createUserSchema,
   listUsersSchema,
   updateUserSchema,
 } from "./users.validation";
+
+function actorOf(req: Request): Actor {
+  // La ruta esta detras de authenticate + authorize("admin").
+  return { userId: req.internalUser!.userId, role: req.internalUser!.role };
+}
+
+function failFrom(res: Response, err: unknown) {
+  const e = err as { status?: number; code?: string; message?: string };
+  return fail(res, e.status ?? 500, e.message ?? "Error", e.code);
+}
 
 export const usersController = {
   async list(req: Request, res: Response) {
@@ -28,11 +38,10 @@ export const usersController = {
     if (error) return fail(res, 400, error.message, "invalid_body");
 
     try {
-      const user = await usersService.create(value);
+      const user = await usersService.create(value, actorOf(req));
       return ok(res, user, 201);
     } catch (err) {
-      const status = (err as { status?: number }).status ?? 500;
-      return fail(res, status, (err as Error).message);
+      return failFrom(res, err);
     }
   },
 
@@ -45,14 +54,22 @@ export const usersController = {
   async update(req: Request, res: Response) {
     const { error, value } = updateUserSchema.validate(req.body);
     if (error) return fail(res, 400, error.message, "invalid_body");
-    const user = await usersService.update(req.params.id, value);
-    if (!user) return fail(res, 404, "Usuario no encontrado", "not_found");
-    return ok(res, user);
+    try {
+      const user = await usersService.update(req.params.id, value, actorOf(req));
+      if (!user) return fail(res, 404, "Usuario no encontrado", "not_found");
+      return ok(res, user);
+    } catch (err) {
+      return failFrom(res, err);
+    }
   },
 
   async remove(req: Request, res: Response) {
-    const user = await usersService.softDelete(req.params.id);
-    if (!user) return fail(res, 404, "Usuario no encontrado", "not_found");
-    return ok(res, user);
+    try {
+      const user = await usersService.softDelete(req.params.id, actorOf(req));
+      if (!user) return fail(res, 404, "Usuario no encontrado", "not_found");
+      return ok(res, user);
+    } catch (err) {
+      return failFrom(res, err);
+    }
   },
 };

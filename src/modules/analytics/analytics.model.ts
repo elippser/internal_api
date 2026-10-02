@@ -20,6 +20,12 @@ const analyticsEventSchema = new Schema(
      * emisores server-side que no reintentan pueden omitirlo.
      */
     correlationId: { type: String, default: null },
+    /**
+     * Vencimiento propio (`retentionDays` del registry). Solo lo llevan los
+     * eventos de alto volumen (interaccion de UI, 30 dias); el resto lo omite y
+     * rige el TTL de 1 año sobre serverTimestamp.
+     */
+    expiresAt: { type: Date },
   },
   { collection: "analytics_events", versionKey: false },
 );
@@ -38,6 +44,9 @@ analyticsEventSchema.index(
   { correlationId: 1 },
   { unique: true, sparse: true },
 );
+// TTL propio por evento: Mongo borra cuando pasa `expiresAt`. Los documentos
+// sin el campo no vencen por este indice.
+analyticsEventSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 // TTL: 1 año
 analyticsEventSchema.index(
   { serverTimestamp: 1 },

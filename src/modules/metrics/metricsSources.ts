@@ -33,6 +33,12 @@ export interface PmsReservation {
   /** F0: superficie que creó la reserva. Discriminante de la métrica del piloto. */
   origin?: "engine" | "staff" | "agent";
   engineSessionId?: string;
+  /** Origen de la reserva online (booking-api): sólo se leen geo, dispositivo y atribución. */
+  bookingContext?: {
+    geo?: { country?: string; city?: string };
+    device?: { type?: string };
+    attribution?: { channelGroup?: string; source?: string };
+  };
   nights?: number;
   totalAmount?: number;
   currency?: string;
@@ -54,6 +60,7 @@ const reservationSchema = new Schema(
     sourceChannelId: String,
     origin: String,
     engineSessionId: String,
+    bookingContext: Schema.Types.Mixed,
     nights: Number,
     totalAmount: Number,
     currency: String,

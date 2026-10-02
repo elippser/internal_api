@@ -153,7 +153,11 @@ export const analyticsService = {
         input.payload ?? {},
         // Tolera campos extra: un emisor que agrega contexto no debe perder el
         // evento entero. Lo que importa es que los campos del contrato estén.
-        { allowUnknown: true, stripUnknown: false },
+        // Salvo los `strict` (interaccion de UI): ahi un campo de mas puede
+        // traer texto del usuario, y el evento se descarta entero.
+        def.strict
+          ? { allowUnknown: false, stripUnknown: false }
+          : { allowUnknown: true, stripUnknown: false },
       );
       if (error) {
         drop("invalid_payload");
@@ -187,6 +191,9 @@ export const analyticsService = {
         clientTimestamp: new Date(input.clientTimestamp),
         serverTimestamp: new Date(),
         correlationId: input.correlationId || null,
+        ...(def.retentionDays
+          ? { expiresAt: new Date(Date.now() + def.retentionDays * 86_400_000) }
+          : {}),
       });
     }
 

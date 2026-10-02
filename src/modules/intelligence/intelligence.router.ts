@@ -14,7 +14,7 @@ function authenticateUserOrService(req: Request, res: Response, next: NextFuncti
     next();
     return;
   }
-  authenticate(req, res, next);
+  void authenticate(req, res, next);
 }
 
 // El trigger manual de ingesta solo para servicios o usuarios developer+.

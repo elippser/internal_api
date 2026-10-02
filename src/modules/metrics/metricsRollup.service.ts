@@ -112,6 +112,11 @@ async function collectReservations(
       totalAmount: 1,
       createdAt: 1,
       confirmedAt: 1,
+      "bookingContext.geo.country": 1,
+      "bookingContext.geo.city": 1,
+      "bookingContext.device.type": 1,
+      "bookingContext.attribution.channelGroup": 1,
+      "bookingContext.attribution.source": 1,
     })
     .lean();
 
@@ -130,6 +135,16 @@ async function collectReservations(
     bump(b, "res_nights", r.nights ?? 0);
     bump(b, "res_amount_base", r.totalAmount ?? 0);
     bumpMap(b, "res_by_source", r.sourceChannelId || "__none__");
+
+    // Origen (sólo reservas online: las manuales no tienen bookingContext).
+    const ctx = r.bookingContext;
+    if (ctx?.geo?.country) {
+      bumpMap(b, "res_by_country", ctx.geo.country);
+      if (ctx.geo.city) bumpMap(b, "res_by_city", `${ctx.geo.country}|${ctx.geo.city}`);
+    }
+    if (ctx?.attribution?.channelGroup) bumpMap(b, "res_by_channel_group", ctx.attribution.channelGroup);
+    if (ctx?.attribution?.source) bumpMap(b, "res_by_traffic_source", ctx.attribution.source);
+    if (ctx?.device?.type) bumpMap(b, "res_by_device", ctx.device.type);
 
     if (r.confirmedAt && r.createdAt) {
       const mins =

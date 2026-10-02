@@ -35,6 +35,14 @@ export interface EventDefinition {
   sources: EventSource[];
   /** Contrato del payload. `unknown(true)` donde convenga tolerar extras. */
   payload: Joi.ObjectSchema;
+  /**
+   * Rechaza el evento si el payload trae CUALQUIER campo fuera del contrato
+   * (por defecto la ingesta los tolera). Para eventos de interaccion de UI: un
+   * campo de mas es la forma en que se cuela texto del usuario.
+   */
+  strict?: boolean;
+  /** Retencion propia en dias (fija `expiresAt`; si no, rige el TTL de 1 año). */
+  retentionDays?: number;
 }
 
 const PMS: EventSource[] = ["pms-core"];
@@ -52,6 +60,36 @@ const ENGINE_FRONTS: EventSource[] = [
 /** Emitido server-side por un api, no por un browser. */
 const num = Joi.number();
 const str = Joi.string().max(200);
+
+// ── Piezas de los eventos de interaccion de UI (USABILIDAD-SPEC.md §4.3) ────
+// Todo con patron cerrado: ningun campo de texto libre. Si un emisor manda un
+// mensaje o un label en lugar de un codigo, el patron lo rechaza.
+/** Ruta normalizada + vista: "reservas:tarifas", "projects/:id/editor". */
+const screenKey = Joi.string()
+  .max(160)
+  .pattern(/^[a-z0-9][a-z0-9:/_.-]*$/);
+/** Id de app del catalogo (kebab-case). */
+const appIdUi = Joi.string().max(60).pattern(/^[a-z0-9][a-z0-9-]*$/);
+/** Hash corto (firma estructural del elemento, del error o del formulario). */
+const sig = Joi.string().pattern(/^[a-f0-9]{6,16}$/);
+/** Codigo estable: sin espacios, asi un mensaje traducido no entra. */
+const stableCode = Joi.string().max(80).pattern(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/);
+const vwBucket = Joi.string().valid("m", "t", "d");
+const px = Joi.number().integer().min(0).max(200_000);
+const ms = Joi.number().integer().min(0).max(86_400_000);
+const UI_RETENTION_DAYS = 30;
+export const LAYOUT_KINDS = [
+  "nav",
+  "button",
+  "link",
+  "input",
+  "select",
+  "table",
+  "card",
+  "modal",
+  "text",
+  "image",
+] as const;
 
 export const EVENT_REGISTRY: Record<string, EventDefinition> = {
   // ── Onboarding (alta guiada de 9 pasos) ──────────────────────────────────
@@ -286,6 +324,136 @@ export const EVENT_REGISTRY: Record<string, EventDefinition> = {
     }),
   },
 
+  // ── Interaccion de UI (USABILIDAD-SPEC.md §4.3) ──────────────────────────
+  // Los emite el uiTracker del PMS; los de las apps en iframe los reemite el
+  // anfitrion por el puente, asi que la fuente es siempre pms-core. Estrictos
+  // (ningun campo extra) y con retencion de 30 dias: son crudos de alto volumen
+  // que el rollup de usabilidad consolida cada noche.
+  ui_click: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      /** Coordenadas de PAGINA (incluyen el scroll), en px CSS. */
+      x: px.required(),
+      y: px.required(),
+      vw: px.min(1).required(),
+      vh: px.min(1).required(),
+      docH: px.min(1).required(),
+      vwBucket: vwBucket.required(),
+      /** Que tipo de elemento era, nunca que decia. */
+      el: Joi.object({
+        tag: Joi.string().max(20).pattern(/^[a-z][a-z0-9-]*$/).required(),
+        role: Joi.string().max(30).pattern(/^[a-z][a-z-]*$/),
+        track: Joi.string().max(60).pattern(/^[a-z0-9][a-z0-9._:-]*$/i),
+        sig: sig.required(),
+      }).required(),
+      /** Clics en rafaga (>= 3 en 24 px y 700 ms). 0 = clic comun. */
+      rage: Joi.number().integer().min(0).max(50).default(0),
+      /** Parecia interactivo y en 1 s no paso nada. */
+      dead: Joi.boolean().default(false),
+    }),
+  },
+  ui_screen_left: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      vwBucket: vwBucket.required(),
+      activeMs: ms.required(),
+      idleMs: ms.required(),
+      maxScrollPct: Joi.number().min(0).max(100).required(),
+      docH: px.min(1),
+      clicks: Joi.number().integer().min(0).max(100_000),
+    }),
+  },
+  ui_error_shown: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      kind: Joi.string().valid("alert", "inline", "boundary", "toast").required(),
+      code: stableCode,
+    }),
+  },
+  ui_form_invalid: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      formSig: sig.required(),
+      fields: Joi.number().integer().min(0).max(200),
+    }),
+  },
+  ui_js_error: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      kind: Joi.string().valid("error", "unhandledrejection").required(),
+      /** Hash de mensaje + archivo:linea. El mensaje no viaja (puede traer datos). */
+      sig: sig.required(),
+    }),
+  },
+  ui_vitals: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      vwBucket: vwBucket,
+      lcp: Joi.number().min(0).max(120_000),
+      inp: Joi.number().min(0).max(120_000),
+      cls: Joi.number().min(0).max(10),
+      ttfb: Joi.number().min(0).max(120_000),
+    }),
+  },
+  ui_layout: {
+    category: "ui",
+    sources: PMS,
+    strict: true,
+    retentionDays: UI_RETENTION_DAYS,
+    payload: Joi.object({
+      appId: appIdUi.required(),
+      screenKey: screenKey.required(),
+      vwBucket: vwBucket.required(),
+      vw: px.min(1).required(),
+      docH: px.min(1).required(),
+      /** Esqueleto: solo rectangulos y tipo. Nada de texto ni capturas. */
+      rects: Joi.array()
+        .max(150)
+        .items(
+          Joi.object({
+            x: px.required(),
+            y: px.required(),
+            w: px.required(),
+            h: px.required(),
+            k: Joi.string()
+              .valid(...LAYOUT_KINDS)
+              .required(),
+          }),
+        )
+        .required(),
+    }),
+  },
+
   // ── Funnel del motor de reservas ─────────────────────────────────────────
   // Los 6 pasos van con `sessionId` real (no el centinela "server"): el funnel
   // se computa por sesión distinta, no contando documentos.
@@ -359,6 +527,18 @@ export const EVENT_REGISTRY: Record<string, EventDefinition> = {
       totalAmount: num.min(0),
       currency: str.max(10),
       servicesCount: num.min(0),
+      // Origen de la reserva (booking-api bookingContext; sin IP).
+      guestCountry: str.max(2),
+      guestRegion: str.max(80),
+      guestCity: str.max(120),
+      deviceType: str.max(20),
+      language: str.max(35),
+      surface: str.max(20),
+      channelGroup: str.max(30),
+      trafficSource: str.max(120),
+      trafficMedium: str.max(120),
+      campaign: str.max(160),
+      referrerHost: str.max(200),
     }),
   },
 

@@ -17,6 +17,9 @@ export const authService = {
     if (user!.status !== "active") {
       throwUnauthorized("Usuario inactivo");
     }
+    if (user!.accessExpiresAt && user!.accessExpiresAt.getTime() <= Date.now()) {
+      throwUnauthorized("Tu acceso vencio. Pedile a un admin que lo renueve.");
+    }
 
     const valid = await bcrypt.compare(password, user!.passwordHash);
     if (!valid) {

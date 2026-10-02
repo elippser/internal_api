@@ -48,6 +48,16 @@ const metricsDailySchema = new Schema(
     res_time_to_confirm_p50_min: { type: Number, default: null },
     /** Reservas por `sourceChannelId` (incluye la clave "__none__"). */
     res_by_source: { type: Schema.Types.Mixed, default: {} },
+    /** Reservas online por país desde el que se reservó (IP; ver booking-api bookingContext). */
+    res_by_country: { type: Schema.Types.Mixed, default: {} },
+    /** Por ciudad, con clave "PAÍS|Ciudad". */
+    res_by_city: { type: Schema.Types.Mixed, default: {} },
+    /** Por canal de la visita (organic_search, organic_social, ai_assistant…). */
+    res_by_channel_group: { type: Schema.Types.Mixed, default: {} },
+    /** Por fuente de la visita (google, instagram, chatgpt…). */
+    res_by_traffic_source: { type: Schema.Types.Mixed, default: {} },
+    /** Por tipo de dispositivo (mobile, tablet, desktop). */
+    res_by_device: { type: Schema.Types.Mixed, default: {} },
 
     // ── Embudo del motor (sesiones distintas por paso) ───────────────────
     funnel_search: num,

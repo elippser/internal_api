@@ -23,6 +23,8 @@ import { startSessionExpiryJob } from "./modules/conversations/services/sessionE
 import { ticketsRouter } from "./modules/tickets/tickets.router";
 import { startTicketingCron } from "./modules/tickets/ticketingCron";
 import { startMetricsCron } from "./modules/metrics/metricsCron";
+import { startUsabilityCron } from "./modules/usability/usabilityCron";
+import { usabilityRouter } from "./modules/usability/usability.router";
 import { hotelsRouter } from "./modules/hotels/hotels.router";
 import { accessRouter } from "./modules/access/access.router";
 import { usageRouter } from "./modules/usage/usage.router";
@@ -151,6 +153,8 @@ app.use(`${BASE}/auth`, authRouter);
 app.use(`${BASE}/users`, usersRouter);
 app.use(`${BASE}/analytics`, analyticsRouter);
 app.use(`${BASE}/metrics`, metricsRouter);
+// Usabilidad: mapas, trabas, recorridos y analisis de la IA (USABILIDAD-SPEC.md).
+app.use(`${BASE}/usability`, usabilityRouter);
 app.use(`${BASE}/agents`, agentsRouter);
 app.use(`${BASE}/tools`, toolsRouter);
 app.use(`${BASE}/knowledge`, knowledgeRouter);
@@ -297,6 +301,7 @@ connectDB()
     startSessionExpiryJob();
     startTicketingCron();
     startMetricsCron();
+    startUsabilityCron();
 
     // El motor arranca DESPUES de conectar: el worker empieza a reclamar de
     // inmediato y sin conexion solo produciria ruido de errores. Es idempotente
