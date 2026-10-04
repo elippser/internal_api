@@ -198,9 +198,21 @@ export const Lead = model("Lead", leadSchema);
 const leadInviteSchema = new Schema(
   {
     inviteId: { type: String, required: true, unique: true, index: true },
-    leadId: { type: String, required: true, index: true },
-    /** Copia del email al momento de emitir: el invite vale para ESE correo. */
-    email: { type: String, required: true, lowercase: true, trim: true, index: true },
+    /**
+     * El lead del invite. Vacio en un enlace LIBRE hasta que se canjea: ahi se
+     * crea (o se reusa) el lead con el correo con el que se registro.
+     */
+    leadId: { type: String, default: "", index: true },
+    /**
+     * Copia del email al momento de emitir: el invite vale para ESE correo.
+     * Vacio en un enlace libre (`open`): sirve para cualquier correo, una vez.
+     */
+    email: { type: String, default: "", lowercase: true, trim: true, index: true },
+    /** Enlace libre: sin correo atado, generado en el panel para alguien contactado a mano. */
+    open: { type: Boolean, default: false, index: true },
+    /** Para quien era, a ojo del operador ("Laura, Cabañas del Valle"). Solo referencia. */
+    label: { type: String, default: "", maxlength: 160 },
+    locale: { type: String, default: "es", maxlength: 5 },
 
     /**
      * SHA-256 del token en hex. El token en claro existe una sola vez: dentro

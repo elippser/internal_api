@@ -135,6 +135,12 @@ export const directLinkSchema = Joi.object({
   notes: Joi.string().allow("").max(4000).optional(),
 });
 
+/** El enlace libre: sin correo. `label` es solo una referencia para el panel. */
+export const openLinkSchema = Joi.object({
+  label: Joi.string().trim().allow("").max(160).optional(),
+  locale: Joi.string().valid("es", "en", "pt", "fr", "de").optional(),
+});
+
 export const statsSchema = Joi.object({
   days: Joi.number().integer().min(1).max(365).default(30),
 });

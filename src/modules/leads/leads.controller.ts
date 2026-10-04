@@ -8,6 +8,7 @@ import {
   captureLeadSchema,
   consumeInviteSchema,
   directLinkSchema,
+  openLinkSchema,
   listLeadsSchema,
   statsSchema,
   updateLeadSchema,
@@ -216,6 +217,36 @@ export const leadsController = {
     try {
       const actor = { userId: req.internalUser?.userId, email: req.internalUser?.email };
       return ok(res, await leadsService.createDirectLink(value, actor));
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
+  /** POST /leads/open-links — enlace libre de un solo uso, sin correo atado. */
+  async createOpenLink(req: Request, res: Response) {
+    const { error, value } = openLinkSchema.validate(req.body ?? {}, { stripUnknown: true });
+    if (error) return fail(res, 400, error.message, "invalid_body");
+    try {
+      const actor = { userId: req.internalUser?.userId, email: req.internalUser?.email };
+      return ok(res, await leadsService.createOpenLink(value, actor));
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
+  /** GET /leads/open-links — los enlaces libres emitidos y su estado. */
+  async listOpenLinks(_req: Request, res: Response) {
+    try {
+      return ok(res, await leadsService.listOpenLinks());
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
+  /** POST /leads/open-links/:inviteId/revoke */
+  async revokeOpenLink(req: Request, res: Response) {
+    try {
+      return ok(res, await leadsService.revokeOpenLink(req.params.inviteId));
     } catch (err) {
       return handleErr(res, err);
     }

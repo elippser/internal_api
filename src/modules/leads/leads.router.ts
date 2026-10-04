@@ -53,6 +53,10 @@ leadsRouter.get("/stats", authorize("analyst"), c.stats);
 // El enlace directo abre el alta sin formulario, sin filtro y sin correo: es
 // la puerta mas ancha del modulo, por eso el piso es admin y no support.
 leadsRouter.post("/direct-link", authorize("admin"), c.createDirectLink);
+// Enlaces libres: sin correo atado, un solo uso. Misma puerta, mismo piso.
+leadsRouter.get("/open-links", authorize("admin"), c.listOpenLinks);
+leadsRouter.post("/open-links", authorize("admin"), c.createOpenLink);
+leadsRouter.post("/open-links/:inviteId/revoke", authorize("admin"), c.revokeOpenLink);
 leadsRouter.post("/:id/direct-link", authorize("admin"), c.directLinkForLead);
 
 leadsRouter.get("/", authorize("support"), c.list);

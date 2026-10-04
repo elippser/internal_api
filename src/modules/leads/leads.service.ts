@@ -89,6 +89,14 @@ export interface InviteActor {
   email?: string;
 }
 
+/**
+ * El enlace LIBRE: `/register/direct/<token>`. El PMS lo redirige al alta de
+ * siempre (`/register?inv=`), asi que el corte sigue siendo el mismo token.
+ */
+function openLinkUrl(token: string, locale: string): string {
+  return `${appUrl()}/register/direct/${token}?lang=${encodeURIComponent(locale)}`;
+}
+
 const loginUrl = (locale: string) => `${appUrl()}/login?lang=${encodeURIComponent(locale)}`;
 
 // ---------------------------------------------------------------------------
@@ -443,6 +451,81 @@ export const leadsService = {
     return leadsService.directLinkForLead(lead.leadId, actor);
   },
 
+  // ------------------------------------------------------- enlace libre ---
+
+  /**
+   * Enlace LIBRE de alta: sin correo atado, para alguien que el operador
+   * contacto a mano. Lo que conserva del invite normal es lo que acota el
+   * dano si se filtra: **un solo uso**, vence, y se puede revocar. El lead
+   * no existe hasta el canje: ahi se crea con el correo con el que se registro.
+   */
+  async createOpenLink(input: { label?: string; locale?: string }, actor: InviteActor) {
+    const token = newToken();
+    const expiresAt = new Date(Date.now() + ttlHours() * 3_600_000);
+    const locale = input.locale || "es";
+    const invite = await LeadInvite.create({
+      inviteId: makeId("inv"),
+      open: true,
+      label: (input.label ?? "").trim().slice(0, 160),
+      locale,
+      tokenHash: hashToken(token),
+      expiresAt,
+      sentAt: new Date(),
+      channel: "direct",
+      createdBy: { userId: actor.userId ?? "", email: actor.email ?? "" },
+    });
+    return {
+      inviteId: invite.inviteId,
+      url: openLinkUrl(token, locale),
+      label: invite.label,
+      expiresAt,
+    };
+  },
+
+  /** Los enlaces libres emitidos, mas nuevos primero. Nunca el token. */
+  async listOpenLinks(limit = 30) {
+    const rows = await LeadInvite.find({ open: true })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select("-tokenHash")
+      .lean();
+    const now = Date.now();
+    return rows.map((r) => ({
+      inviteId: r.inviteId,
+      label: r.label ?? "",
+      locale: r.locale ?? "es",
+      createdAt: (r as { createdAt?: Date }).createdAt ?? r.sentAt,
+      createdBy: r.createdBy?.email ?? "",
+      expiresAt: r.expiresAt,
+      openedAt: r.openedAt,
+      usedAt: r.usedAt,
+      usedBy: r.usedAt ? r.email : "",
+      leadId: r.leadId || null,
+      revokedAt: r.revokedAt,
+      state: r.usedAt
+        ? "used"
+        : r.revokedAt
+          ? "revoked"
+          : r.expiresAt.getTime() < now
+            ? "expired"
+            : "active",
+    }));
+  },
+
+  async revokeOpenLink(inviteId: string) {
+    const res = await LeadInvite.updateOne(
+      { inviteId, open: true, usedAt: null, revokedAt: null },
+      { $set: { revokedAt: new Date(), revokedReason: "manual" } },
+    );
+    if (!res.modifiedCount) {
+      throw Object.assign(new Error("El enlace no existe o ya no esta vigente"), {
+        status: 404,
+        code: "not_active",
+      });
+    }
+    return { revoked: true };
+  },
+
   /** Corta el acceso a mano, sin borrar el lead. */
   async revokeInvites(leadId: string, reason = "manual") {
     const res = await LeadInvite.updateMany(
@@ -475,6 +558,32 @@ export const leadsService = {
     if (invite.revokedAt) return { valid: false as const, reason: "revoked" };
     if (invite.expiresAt.getTime() < Date.now()) {
       return { valid: false as const, reason: "expired" };
+    }
+
+    // Enlace libre: no hay lead todavia. Se devuelve uno vacio (el PMS deja el
+    // correo editable cuando viene vacio) con el idioma del enlace.
+    if (invite.open) {
+      if (!invite.openedAt) {
+        invite.openedAt = new Date();
+        await invite.save();
+      }
+      return {
+        valid: true as const,
+        open: true,
+        lead: {
+          leadId: "",
+          email: "",
+          contactName: "",
+          hotelName: "",
+          lodgingType: "",
+          units: null,
+          countryCode: "",
+          city: "",
+          phone: "",
+          locale: invite.locale ?? "es",
+        },
+        expiresAt: invite.expiresAt,
+      };
     }
 
     const lead = await Lead.findOne({ leadId: invite.leadId }).lean();
@@ -533,6 +642,7 @@ export const leadsService = {
     if (invite.expiresAt.getTime() < Date.now()) {
       return { ok: false as const, reason: "expired" };
     }
+    if (invite.open) return leadsService.consumeOpenLink(tokenHash, email, ctx);
     if (invite.email !== email) {
       invite.failedAttempts = (invite.failedAttempts ?? 0) + 1;
       await invite.save();
@@ -569,6 +679,60 @@ export const leadsService = {
     );
 
     return { ok: true as const, leadId: claimed.leadId };
+  },
+
+  /**
+   * Canje de un enlace libre. Mismo candado atomico que el normal (dos altas
+   * simultaneas con el mismo enlace dan UNA cuenta), y ademas deja asentado
+   * con que correo se uso y crea (o cierra) el lead de esa persona, para que
+   * el embudo y la ficha la muestren como cualquier otra alta.
+   */
+  async consumeOpenLink(
+    tokenHash: string,
+    email: string,
+    ctx: { userId?: string; ip?: string; userAgent?: string },
+  ) {
+    const claimed = await LeadInvite.findOneAndUpdate(
+      { tokenHash, open: true, usedAt: null, revokedAt: null },
+      {
+        $set: {
+          usedAt: new Date(),
+          email,
+          usedFrom: { ip: ctx.ip ?? "", userAgent: (ctx.userAgent ?? "").slice(0, 400) },
+        },
+      },
+      { new: true },
+    );
+    if (!claimed) return { ok: false as const, reason: "used" };
+
+    const now = new Date();
+    const registered = {
+      status: "registered" as LeadStatus,
+      statusChangedAt: now,
+      registeredAt: now,
+      registeredUserId: ctx.userId ?? null,
+      "invite.usedAt": now,
+      "invite.lastChannel": "direct",
+    };
+    let lead = await Lead.findOne({ email }).sort({ createdAt: -1 });
+    if (lead) {
+      await Lead.updateOne({ leadId: lead.leadId }, { $set: registered });
+    } else {
+      lead = await Lead.create({
+        leadId: makeId("lead"),
+        hotelName: claimed.label || email,
+        email,
+        source: "manual",
+        locale: claimed.locale ?? "es",
+        ownerUserId: claimed.createdBy?.userId || null,
+        notes: claimed.label ? `Enlace libre: ${claimed.label}` : "Enlace libre",
+        invite: { sentCount: 1, firstSentAt: claimed.sentAt, lastSentAt: claimed.sentAt },
+        ...registered,
+      });
+    }
+    await LeadInvite.updateOne({ tokenHash }, { $set: { leadId: lead.leadId } });
+
+    return { ok: true as const, leadId: lead.leadId };
   },
 
   // ---------------------------------------------------------------- panel ---
