@@ -166,6 +166,8 @@ const leadSchema = new Schema(
       revokedAt: { type: Date, default: null },
       /** Ultimo error del proveedor de mail, si lo hubo. Se limpia al reenviar. */
       lastError: { type: String, default: "" },
+      /** Canal del ultimo acceso emitido: `email` o `direct` (enlace del panel). */
+      lastChannel: { type: String, default: "email" },
     },
 
     // ---- Cierre del circuito ----
@@ -201,10 +203,23 @@ const leadInviteSchema = new Schema(
     email: { type: String, required: true, lowercase: true, trim: true, index: true },
 
     /**
-     * SHA-256 del token en hex. El token en claro existe una sola vez, dentro
-     * del mail. Ni el panel ni la base pueden reconstruirlo.
+     * SHA-256 del token en hex. El token en claro existe una sola vez: dentro
+     * del mail, o en la respuesta que genera el enlace directo. Ni el panel ni
+     * la base pueden reconstruirlo despues.
      */
     tokenHash: { type: String, required: true, unique: true, index: true },
+
+    /**
+     * Por donde salio. `email` = el correo del alta; `direct` = un operador
+     * genero el enlace en el panel y se lo paso a la persona por su cuenta
+     * (alguien contactado a mano, sin pasar por el formulario ni el filtro).
+     */
+    channel: { type: String, enum: ["email", "direct"], default: "email" },
+    /** Operador interno que genero el enlace directo. */
+    createdBy: {
+      userId: { type: String, default: "" },
+      email: { type: String, default: "" },
+    },
 
     expiresAt: { type: Date, required: true, index: true },
     sentAt: { type: Date, default: null },

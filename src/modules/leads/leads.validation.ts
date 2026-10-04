@@ -109,6 +109,32 @@ export const updateLeadSchema = Joi.object({
   ownerUserId: Joi.string().allow("", null).max(80).optional(),
 }).min(1);
 
+/**
+ * El enlace directo del panel. Solo el email es obligatorio: el operador ya
+ * hablo con la persona y el resto lo completa ella en el alta. Mismo criterio
+ * de TLD que la captura y el canje, para no emitir un enlace que despues el
+ * /register del PMS no puede canjear.
+ */
+export const directLinkSchema = Joi.object({
+  email: Joi.string()
+    .trim()
+    .lowercase()
+    .email({ tlds: { allow: false } })
+    .max(254)
+    .required()
+    .messages({ "string.email": "El email no es valido", "any.required": "Falta el email" }),
+  hotelName: Joi.string().trim().allow("").max(160).optional(),
+  contactName: Joi.string().trim().allow("").max(120).optional(),
+  lodgingType: Joi.string()
+    .valid(...LEAD_LODGING_TYPES)
+    .optional(),
+  countryCode: Joi.string().trim().allow("").length(2).optional(),
+  city: Joi.string().trim().allow("").max(120).optional(),
+  phone: Joi.string().trim().allow("").max(32).optional(),
+  locale: Joi.string().valid("es", "en", "pt", "fr", "de").optional(),
+  notes: Joi.string().allow("").max(4000).optional(),
+});
+
 export const statsSchema = Joi.object({
   days: Joi.number().integer().min(1).max(365).default(30),
 });

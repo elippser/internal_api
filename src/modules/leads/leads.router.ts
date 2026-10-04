@@ -50,6 +50,11 @@ leadsRouter.use(authenticate);
 // Las rutas fijas van ANTES de "/:id" o "stats" caeria como un leadId.
 leadsRouter.get("/stats", authorize("analyst"), c.stats);
 
+// El enlace directo abre el alta sin formulario, sin filtro y sin correo: es
+// la puerta mas ancha del modulo, por eso el piso es admin y no support.
+leadsRouter.post("/direct-link", authorize("admin"), c.createDirectLink);
+leadsRouter.post("/:id/direct-link", authorize("admin"), c.directLinkForLead);
+
 leadsRouter.get("/", authorize("support"), c.list);
 leadsRouter.get("/:id", authorize("support"), c.get);
 leadsRouter.patch("/:id", authorize("support"), c.update);

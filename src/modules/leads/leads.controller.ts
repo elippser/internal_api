@@ -7,6 +7,7 @@ import { leadsService } from "./leads.service";
 import {
   captureLeadSchema,
   consumeInviteSchema,
+  directLinkSchema,
   listLeadsSchema,
   statsSchema,
   updateLeadSchema,
@@ -200,6 +201,31 @@ export const leadsController = {
     try {
       const r = await leadsService.issueInvite(req.params.id);
       return ok(res, { sent: true, expiresAt: r.expiresAt });
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
+  /**
+   * POST /leads/direct-link — enlace de alta para alguien contactado a mano.
+   * Crea (o reusa) el lead por email y devuelve la URL sin mandar correo.
+   */
+  async createDirectLink(req: Request, res: Response) {
+    const { error, value } = directLinkSchema.validate(req.body, { stripUnknown: true });
+    if (error) return fail(res, 400, error.message, "invalid_body");
+    try {
+      const actor = { userId: req.internalUser?.userId, email: req.internalUser?.email };
+      return ok(res, await leadsService.createDirectLink(value, actor));
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
+  /** POST /leads/:id/direct-link — enlace nuevo para un lead existente, sin correo. */
+  async directLinkForLead(req: Request, res: Response) {
+    try {
+      const actor = { userId: req.internalUser?.userId, email: req.internalUser?.email };
+      return ok(res, await leadsService.directLinkForLead(req.params.id, actor));
     } catch (err) {
       return handleErr(res, err);
     }

@@ -67,18 +67,26 @@ const appUrl = () =>
  * por otro lado, y no participan de la autorizacion — quien borre las UTM sigue
  * pudiendo registrarse, quien borre el `inv` no.
  */
-function inviteUrl(token: string, locale: string): string {
+function inviteUrl(token: string, locale: string, channel: InviteChannel = "email"): string {
   const params = new URLSearchParams({
     inv: token,
     // El idioma en que la persona completo el formulario del sitio. El PMS lo
     // lee en su middleware y abre el alta en ese idioma, en vez de adivinarlo
     // por el pais de la IP.
     lang: locale,
-    utm_source: "email",
-    utm_medium: "invite",
+    utm_source: channel === "direct" ? "panel" : "email",
+    utm_medium: channel === "direct" ? "direct_link" : "invite",
     utm_campaign: "lead_access",
   });
   return `${appUrl()}/register?${params.toString()}`;
+}
+
+type InviteChannel = "email" | "direct";
+
+/** Operador del panel que genera un enlace directo (queda en el invite). */
+export interface InviteActor {
+  userId?: string;
+  email?: string;
 }
 
 const loginUrl = (locale: string) => `${appUrl()}/login?lang=${encodeURIComponent(locale)}`;
@@ -117,6 +125,19 @@ export interface CaptureInput {
   elapsedMs?: number | null;
   interacted?: boolean;
   captchaOk?: boolean | null;
+}
+
+/** Lo que carga el operador para generar un enlace directo. Solo el email es obligatorio. */
+export interface DirectLinkInput {
+  email: string;
+  hotelName?: string;
+  contactName?: string;
+  lodgingType?: string;
+  countryCode?: string;
+  city?: string;
+  phone?: string;
+  locale?: string;
+  notes?: string;
 }
 
 export interface CaptureMeta {
@@ -273,47 +294,7 @@ export const leadsService = {
    * dejar vivo un token que la persona no recibio y no puede usar.
    */
   async issueInvite(leadId: string) {
-    const lead = await Lead.findOne({ leadId });
-    if (!lead) throw Object.assign(new Error("Lead no encontrado"), { status: 404 });
-    if (lead.status === "registered") {
-      throw Object.assign(new Error("El lead ya creo su cuenta"), {
-        status: 409,
-        code: "already_registered",
-      });
-    }
-
-    await LeadInvite.updateMany(
-      { leadId, usedAt: null, revokedAt: null },
-      { $set: { revokedAt: new Date(), revokedReason: "resend" } },
-    );
-
-    const token = newToken();
-    const expiresAt = new Date(Date.now() + ttlHours() * 3_600_000);
-
-    await LeadInvite.create({
-      inviteId: makeId("inv"),
-      leadId,
-      email: lead.email,
-      tokenHash: hashToken(token),
-      expiresAt,
-      sentAt: new Date(),
-    });
-
-    const now = new Date();
-    lead.invite = {
-      ...(lead.invite ?? {}),
-      sentCount: (lead.invite?.sentCount ?? 0) + 1,
-      firstSentAt: lead.invite?.firstSentAt ?? now,
-      lastSentAt: now,
-      expiresAt,
-      openedAt: null,
-      usedAt: null,
-      revokedAt: null,
-      lastError: "",
-    } as typeof lead.invite;
-    lead.status = "invited";
-    lead.statusChangedAt = now;
-    await lead.save();
+    const { lead, token, expiresAt } = await leadsService.mintInvite(leadId, "email");
 
     try {
       await leadsMailer.sendInvite({
@@ -339,6 +320,127 @@ export const leadsService = {
     }
 
     return { expiresAt };
+  },
+
+  /**
+   * Emite el token: revoca los vivos del lead, crea el nuevo y actualiza el
+   * resumen. No manda nada — eso lo decide quien llama (correo o enlace directo).
+   * El token en claro sale de aca y en ningun otro lado.
+   */
+  async mintInvite(leadId: string, channel: InviteChannel, actor?: InviteActor) {
+    const lead = await Lead.findOne({ leadId });
+    if (!lead) throw Object.assign(new Error("Lead no encontrado"), { status: 404 });
+    if (lead.status === "registered") {
+      throw Object.assign(new Error("El lead ya creo su cuenta"), {
+        status: 409,
+        code: "already_registered",
+      });
+    }
+
+    await LeadInvite.updateMany(
+      { leadId, usedAt: null, revokedAt: null },
+      { $set: { revokedAt: new Date(), revokedReason: "resend" } },
+    );
+
+    const token = newToken();
+    const expiresAt = new Date(Date.now() + ttlHours() * 3_600_000);
+    const now = new Date();
+
+    await LeadInvite.create({
+      inviteId: makeId("inv"),
+      leadId,
+      email: lead.email,
+      tokenHash: hashToken(token),
+      expiresAt,
+      sentAt: now,
+      channel,
+      createdBy: { userId: actor?.userId ?? "", email: actor?.email ?? "" },
+    });
+
+    lead.invite = {
+      ...(lead.invite ?? {}),
+      sentCount: (lead.invite?.sentCount ?? 0) + 1,
+      firstSentAt: lead.invite?.firstSentAt ?? now,
+      lastSentAt: now,
+      expiresAt,
+      openedAt: null,
+      usedAt: null,
+      revokedAt: null,
+      lastError: "",
+      lastChannel: channel,
+    } as typeof lead.invite;
+    lead.status = "invited";
+    lead.statusChangedAt = now;
+    await lead.save();
+
+    return { lead, token, expiresAt };
+  },
+
+  /**
+   * Enlace directo de alta para un lead que ya existe: mismo token de un solo
+   * uso y atado a su email, pero sin correo. Revoca el acceso anterior, asi que
+   * el ultimo enlace (o el ultimo mail) es el unico que abre el alta.
+   */
+  async directLinkForLead(leadId: string, actor: InviteActor) {
+    const { lead, token, expiresAt } = await leadsService.mintInvite(leadId, "direct", actor);
+    const locale = lead.locale ?? "es";
+    return { leadId, email: lead.email, url: inviteUrl(token, locale, "direct"), expiresAt };
+  },
+
+  /**
+   * Enlace directo para alguien contactado a mano.
+   *
+   * Saltea el formulario del sitio, el filtro anti-bots y el correo: lo usa un
+   * operador para una persona que conoce. Lo que NO saltea son las invariantes
+   * del token — un solo uso, vence, y solo registra ESE email —, asi que si el
+   * enlace se reenvia o se filtra no sirve para abrir otra cuenta.
+   */
+  async createDirectLink(input: DirectLinkInput, actor: InviteActor) {
+    const email = input.email.trim().toLowerCase();
+
+    let lead = await Lead.findOne({ email }).sort({ createdAt: -1 });
+    if (lead?.status === "registered" || (await emailHasPmsAccount(email))) {
+      throw Object.assign(new Error("Ese email ya tiene una cuenta en Roombir"), {
+        status: 409,
+        code: "already_registered",
+      });
+    }
+
+    // Lo que cargo el operador completa la ficha; lo vacio no pisa lo que ya habia.
+    const patch: Record<string, unknown> = {};
+    const setIf = (key: string, value: string | undefined) => {
+      const v = (value ?? "").trim();
+      if (v) patch[key] = v;
+    };
+    setIf("hotelName", input.hotelName);
+    setIf("contactName", input.contactName);
+    setIf("lodgingType", input.lodgingType);
+    setIf("city", input.city);
+    setIf("phone", input.phone);
+    setIf("locale", input.locale);
+    if (input.countryCode?.trim()) patch.countryCode = input.countryCode.trim().toUpperCase();
+
+    if (lead) {
+      // Un lead que el filtro mando a spam o que se descarto vuelve a la cola:
+      // el operador acaba de decir que es una persona real.
+      lead.set(patch);
+      if (input.notes?.trim()) {
+        lead.notes = [lead.notes, input.notes.trim()].filter(Boolean).join("\n\n");
+      }
+      await lead.save();
+    } else {
+      lead = await Lead.create({
+        leadId: makeId("lead"),
+        hotelName: input.hotelName?.trim() || email,
+        email,
+        source: "manual",
+        ownerUserId: actor.userId ?? null,
+        notes: input.notes?.trim() ?? "",
+        ...patch,
+      });
+    }
+
+    return leadsService.directLinkForLead(lead.leadId, actor);
   },
 
   /** Corta el acceso a mano, sin borrar el lead. */
