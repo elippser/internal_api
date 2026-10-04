@@ -29,6 +29,9 @@ export const AREAS = [
     label: "IA",
     prefixes: ["/agents", "/tools", "/knowledge", "/conversations", "/memory", "/growth", "/tourism"],
   },
+  // Asistencia 24/7: el chat en vivo con los usuarios del PMS. Las rutas
+  // /support-chat/runtime/* las llama el PMS con el secret y no pasan por acá.
+  { key: "support", label: "Soporte", prefixes: ["/support-chat"] },
   { key: "feedback", label: "Feedback", prefixes: ["/feedback", "/tickets"] },
   { key: "platform", label: "Plataforma", prefixes: ["/hotels", "/access", "/plans"] },
   { key: "leads", label: "Leads", prefixes: ["/leads"] },
