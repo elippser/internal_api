@@ -92,7 +92,7 @@ async function main() {
   const ok = BANK_BY_ID.get("b3-ocupacion-01")!;
   const ans1 = await call("POST", "/answer", { itemId: ok.id, chosenText: ok.options[ok.correct], certainty: 3 });
   check("practica correcta: correct y cbm +3", ans1.status === 200 && ans1.json.correct === true && ans1.json.cbm === 3, ans1.json);
-  const bad = BANK_BY_ID.get("e5-pagos-01")!;
+  const bad = BANK_BY_ID.get("e5-pago-01")!;
   const wrongText = bad.options.find((_, i) => i !== bad.correct)!;
   const ans2 = await call("POST", "/answer", { itemId: bad.id, chosenText: wrongText, certainty: 3 });
   check("practica incorrecta segura: cbm -6 y porques", ans2.json.correct === false && ans2.json.cbm === -6 && ans2.json.why.length === 3, ans2.json);
