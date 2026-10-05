@@ -44,6 +44,8 @@ export const AREAS = [
   { key: "competitors", label: "Competencia", prefixes: ["/competitors"] },
   { key: "intelligence", label: "Inteligencia", prefixes: ["/intelligence"] },
   { key: "system", label: "Sistema", prefixes: ["/infra", "/architecture", "/system"] },
+  // Academia interna (ROOMBIR-ACADEMY-SPEC.md): induccion del equipo propio.
+  { key: "academy", label: "Academia", prefixes: ["/academy"] },
 ] as const;
 
 export type AreaKey = (typeof AREAS)[number]["key"];

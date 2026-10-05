@@ -26,6 +26,7 @@ import { startTicketingCron } from "./modules/tickets/ticketingCron";
 import { startMetricsCron } from "./modules/metrics/metricsCron";
 import { startUsabilityCron } from "./modules/usability/usabilityCron";
 import { usabilityRouter } from "./modules/usability/usability.router";
+import { academyRouter } from "./modules/academy/academy.router";
 import { hotelsRouter } from "./modules/hotels/hotels.router";
 import { accessRouter } from "./modules/access/access.router";
 import { usageRouter } from "./modules/usage/usage.router";
@@ -156,6 +157,7 @@ app.use(`${BASE}/analytics`, analyticsRouter);
 app.use(`${BASE}/metrics`, metricsRouter);
 // Usabilidad: mapas, trabas, recorridos y analisis de la IA (USABILIDAD-SPEC.md).
 app.use(`${BASE}/usability`, usabilityRouter);
+app.use(`${BASE}/academy`, academyRouter);
 app.use(`${BASE}/agents`, agentsRouter);
 app.use(`${BASE}/tools`, toolsRouter);
 app.use(`${BASE}/knowledge`, knowledgeRouter);

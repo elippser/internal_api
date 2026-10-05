@@ -85,7 +85,9 @@
     "diagnose:ia-credits": "ts-node --transpile-only src/scripts/diagnoseIaCredits.ts",
     "migrate:ia-product-key": "ts-node --transpile-only src/scripts/migrateIaProductKey.ts",
     "fix:ia-plans": "ts-node --transpile-only src/scripts/fixIaPlans.ts",
-    "set:plan-image-limits": "ts-node --transpile-only src/scripts/setPlanImageLimits.ts"
+    "set:plan-image-limits": "ts-node --transpile-only src/scripts/setPlanImageLimits.ts",
+    "smoke:academy": "ts-node --transpile-only src/scripts/smokeAcademy.ts",
+    "academy:stale": "ts-node --transpile-only src/scripts/academyStale.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
