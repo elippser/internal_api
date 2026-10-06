@@ -212,6 +212,8 @@ async function main() {
   check("/academy cae en el area academy", areaForPath("/api/v1/academy/me") === "academy");
   check("area academy en none → rechaza", !checkArea({ academy: "none" }, "GET", "/api/v1/academy/me").ok);
   check("area academy en read → no puede responder", !checkArea({ academy: "read" }, "POST", "/api/v1/academy/answer").ok);
+  check("sistema en read: puede ver usuarios", checkArea({ system: "read" }, "GET", "/api/v1/users").ok);
+  check("sistema en read: no puede crear ni editar usuarios", !checkArea({ system: "read" }, "POST", "/api/v1/users").ok && !checkArea({ system: "read" }, "PATCH", "/api/v1/users/u1").ok);
   check("solo academy: Asistencia en none → rechaza", !checkArea({ academy: "write", support: "none" }, "GET", "/api/v1/support-chat/conversations").ok);
 
   server.close();

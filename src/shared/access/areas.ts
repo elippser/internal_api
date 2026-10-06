@@ -43,7 +43,9 @@ export const AREAS = [
   },
   { key: "competitors", label: "Competencia", prefixes: ["/competitors"] },
   { key: "intelligence", label: "Inteligencia", prefixes: ["/intelligence"] },
-  { key: "system", label: "Sistema", prefixes: ["/infra", "/architecture", "/system"] },
+  // "/users" es el padron interno: sin area, un admin en solo lectura igual podia
+  // crear o editar usuarios.
+  { key: "system", label: "Sistema", prefixes: ["/infra", "/architecture", "/system", "/users"] },
   // Academia interna (ROOMBIR-ACADEMY-SPEC.md): induccion del equipo propio.
   { key: "academy", label: "Academia", prefixes: ["/academy"] },
 ] as const;
