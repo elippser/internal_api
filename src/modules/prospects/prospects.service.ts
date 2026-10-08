@@ -8,6 +8,7 @@ import {
   PIPELINE_STATUSES,
   Prospect,
   ProspectActivity,
+  WEB_PRESENCE,
   isReached,
   outcomeOf,
   recomputeDerived,
@@ -973,5 +974,27 @@ export const prospectsService = {
         email: u.email,
       })),
     };
+  },
+
+  /**
+   * Los prospectos revisados agrupados por presencia web, en el orden de
+   * WEB_PRESENCE (de menos a mas armados). Dentro de cada grupo, por score.
+   * Los que ya tienen motor solo se cuentan: no son la oportunidad.
+   */
+  async webPresence() {
+    const docs = await Prospect.find({ "webPresence.status": { $exists: true } })
+      .select("prospectId name handle handleUrl lodgingType location country contact status score doNotCall webPresence")
+      .sort({ score: -1, name: 1 })
+      .lean();
+    const groups = WEB_PRESENCE.map((status) => ({
+      status,
+      items: status === "has_engine" ? [] : docs.filter((d) => d.webPresence?.status === status).map((d) => sanitizeDoc(d)),
+      count: docs.filter((d) => d.webPresence?.status === status).length,
+    }));
+    const checkedAt = docs.reduce<Date | null>((max, d) => {
+      const at = d.webPresence?.checkedAt ? new Date(d.webPresence.checkedAt) : null;
+      return at && (!max || at > max) ? at : max;
+    }, null);
+    return { total: docs.length, checkedAt, groups };
   },
 };

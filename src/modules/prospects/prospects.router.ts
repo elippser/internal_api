@@ -19,6 +19,7 @@ prospectsRouter.use(authenticate);
 prospectsRouter.get("/dashboard", authorize("analyst"), c.dashboard);
 prospectsRouter.get("/queue", authorize("support"), c.queue);
 prospectsRouter.get("/facets", authorize("support"), c.facets);
+prospectsRouter.get("/web-presence", authorize("support"), c.webPresence);
 prospectsRouter.get("/activities", authorize("support"), c.listActivities);
 
 prospectsRouter.post("/import", authorize("developer"), c.importRows);

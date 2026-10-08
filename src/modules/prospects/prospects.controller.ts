@@ -142,6 +142,14 @@ export const prospectsController = {
     }
   },
 
+  async webPresence(_req: Request, res: Response) {
+    try {
+      return ok(res, await prospectsService.webPresence());
+    } catch (err) {
+      return handleErr(res, err);
+    }
+  },
+
   async facets(_req: Request, res: Response) {
     try {
       return ok(res, await prospectsService.facets());

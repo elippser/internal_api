@@ -62,6 +62,7 @@
     "unify:competitors": "ts-node --transpile-only src/scripts/unifyCompetitorList.ts",
     "migrate:mkt-next": "ts-node --transpile-only src/scripts/migrateMktSiteToNext.ts",
     "import:prospects": "ts-node --transpile-only src/scripts/importProspects.ts",
+    "import:web-presence": "ts-node --transpile-only src/scripts/importWebPresence.ts",
     "smoke:prospects": "ts-node --transpile-only src/scripts/smokeProspects.ts",
     "smoke:dns": "ts-node --transpile-only src/scripts/smokeDns.ts",
     "smoke:infra": "ts-node --transpile-only src/scripts/smokeInfra.ts",

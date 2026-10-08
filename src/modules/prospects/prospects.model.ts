@@ -142,6 +142,23 @@ export type ProspectPriority = (typeof PROSPECT_PRIORITIES)[number];
 export const CONTACTABILITY = ["phone", "digital", "none"] as const;
 export type Contactability = (typeof CONTACTABILITY)[number];
 
+/**
+ * Presencia web del alojamiento: si tiene web, si funciona y si vende con motor
+ * de reservas. Sale de revisar la ficha, la bio de Instagram y su Linktree, y
+ * ordena la venta: quien no tiene web necesita sitio + motor; quien tiene web
+ * sin motor, el motor. El orden del array es el de la pantalla.
+ */
+export const WEB_PRESENCE = [
+  "no_web",
+  "web_down",
+  "whatsapp_only",
+  "social_only",
+  "ota_only",
+  "web_no_engine",
+  "has_engine",
+] as const;
+export type WebPresence = (typeof WEB_PRESENCE)[number];
+
 // ---------------------------------------------------------------------------
 // Actividad (cada intento de contacto)
 // ---------------------------------------------------------------------------
@@ -230,6 +247,22 @@ const contactSchema = new Schema(
   { _id: false },
 );
 
+const webPresenceSchema = new Schema(
+  {
+    status: { type: String, enum: WEB_PRESENCE, required: true, index: true },
+    /** Como reserva hoy: "reserva por WhatsApp", "formulario de contacto"... */
+    detail: { type: String, default: "" },
+    /** La web que se reviso, si la hay. */
+    url: { type: String, required: false },
+    /** Motor detectado (Cloudbeds, Pxsol...) cuando status es has_engine. */
+    engine: { type: String, required: false },
+    /** De donde salio la web: la ficha, la bio de Instagram o su Linktree. */
+    via: { type: String, required: false },
+    checkedAt: { type: Date, required: false },
+  },
+  { _id: false },
+);
+
 /** Cada post del que salio el perfil. Sirve de evidencia y de senal de vida. */
 const postSchema = new Schema(
   {
@@ -264,6 +297,8 @@ const prospectSchema = new Schema(
     region: { type: String, required: false, index: true },
 
     contact: { type: contactSchema, default: () => ({}) },
+    /** Ausente = todavia no se reviso. */
+    webPresence: { type: webPresenceSchema, required: false },
 
     // --- Estado comercial ---------------------------------------------------
     status: { type: String, enum: PROSPECT_STATUSES, default: "new", index: true },
