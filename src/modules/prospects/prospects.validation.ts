@@ -84,6 +84,7 @@ export const updateProspectSchema = Joi.object({
   nextActionAt: Joi.date().iso().allow(null),
   nextActionNote: text(500),
   doNotCall: Joi.boolean(),
+  contactMarked: Joi.boolean(),
   tags: Joi.array().items(Joi.string().trim().min(1).max(60)).max(20),
   notes: text(10_000),
 })

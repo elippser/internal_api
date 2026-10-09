@@ -144,6 +144,8 @@ export interface UpdateProspectInput {
   nextActionAt?: string | Date | null;
   nextActionNote?: string;
   doNotCall?: boolean;
+  /** Tilde de Presencia web: true marca ahora, false la saca. */
+  contactMarked?: boolean;
   tags?: string[];
   notes?: string;
 }
@@ -240,7 +242,7 @@ export const prospectsService = {
     return sanitizeDoc(doc.toObject());
   },
 
-  async update(prospectId: string, input: UpdateProspectInput) {
+  async update(prospectId: string, input: UpdateProspectInput, userEmail?: string) {
     const doc = await Prospect.findOne({ prospectId });
     if (!doc) throw httpError(404, "Prospecto no encontrado", "not_found");
     const now = new Date();
@@ -311,6 +313,16 @@ export const prospectsService = {
     if (input.doNotCall !== undefined) {
       doc.doNotCall = input.doNotCall;
       if (input.doNotCall) doc.nextActionAt = undefined;
+    }
+    if (input.contactMarked !== undefined) {
+      // Re-tildar uno ya marcado conserva la fecha original.
+      if (input.contactMarked && !doc.contactMarkedAt) {
+        doc.contactMarkedAt = now;
+        doc.contactMarkedBy = userEmail;
+      } else if (!input.contactMarked) {
+        doc.contactMarkedAt = undefined;
+        doc.contactMarkedBy = undefined;
+      }
     }
     if (input.tags !== undefined) doc.tags = input.tags;
     if (input.notes !== undefined) doc.notes = input.notes;
@@ -983,7 +995,7 @@ export const prospectsService = {
    */
   async webPresence() {
     const docs = await Prospect.find({ "webPresence.status": { $exists: true } })
-      .select("prospectId name handle handleUrl lodgingType location country contact status score doNotCall webPresence")
+      .select("prospectId name handle handleUrl lodgingType location country contact status score doNotCall webPresence contactMarkedAt contactMarkedBy")
       .sort({ score: -1, name: 1 })
       .lean();
     const groups = WEB_PRESENCE.map((status) => ({

@@ -299,6 +299,14 @@ const prospectSchema = new Schema(
     contact: { type: contactSchema, default: () => ({}) },
     /** Ausente = todavia no se reviso. */
     webPresence: { type: webPresenceSchema, required: false },
+    /**
+     * Tilde de "ya lo contacte" de la pantalla Presencia web. Va aparte de
+     * `webPresence` porque el import de la revision pisa ese subdocumento, y
+     * aparte de `status` porque no implica una conversacion: es solo memoria
+     * de a quien ya se le escribio. Ausente = sin marcar.
+     */
+    contactMarkedAt: { type: Date, required: false },
+    contactMarkedBy: { type: String, required: false },
 
     // --- Estado comercial ---------------------------------------------------
     status: { type: String, enum: PROSPECT_STATUSES, default: "new", index: true },

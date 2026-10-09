@@ -69,7 +69,7 @@ export const prospectsController = {
     const { error, value } = updateProspectSchema.validate(req.body, { stripUnknown: true });
     if (error) return fail(res, 400, error.message, "invalid_body");
     try {
-      return ok(res, await prospectsService.update(req.params.id, value));
+      return ok(res, await prospectsService.update(req.params.id, value, req.internalUser?.email));
     } catch (err) {
       return handleErr(res, err);
     }
