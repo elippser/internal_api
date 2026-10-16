@@ -233,7 +233,9 @@ function sessionStages(r: Range): PipelineStage[] {
         landingPath: { $first: "$path" },
         locale: { $first: "$locale" },
         country: { $first: "$country" },
-        region: { $first: "$region" },
+        // $max ignora los null: si el primer lote llegó sin provincia (la base
+        // del sitio se estaba bajando tras un deploy), vale la de los siguientes.
+        region: { $max: "$region" },
         device: { $first: "$device" },
         browser: { $first: "$browser" },
         os: { $first: "$os" },
