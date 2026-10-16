@@ -51,6 +51,10 @@ import {
 import { mktprojectRouter } from "./modules/mktproject/mktproject.router";
 import { publicVideoVoRouter } from "./modules/mktvideo/mktvideo.router";
 import { mktvideoRouter } from "./modules/mktvideo/mktvideo.internal.router";
+import {
+  mktAnalyticsRouter,
+  publicMktEventsRouter,
+} from "./modules/mktanalytics/mktanalytics.router";
 import { dnsRouter } from "./modules/dns/dns.router";
 import { infraRouter } from "./modules/infra/infra.router";
 import { architectureRouter } from "./modules/architecture/architecture.router";
@@ -189,6 +193,8 @@ app.use(`${BASE}/mkt/project`, mktprojectRouter);
 app.use(`${BASE}/mkt/site`, mktsiteRouter);
 // Modulo Videos del panel: el montaje de la voz en off, uno por idioma.
 app.use(`${BASE}/mkt/videos`, mktvideoRouter);
+// Trafico de roombir.com: visitas, clics y formularios del sitio de marca.
+app.use(`${BASE}/mkt/analytics`, mktAnalyticsRouter);
 // DNS de roombir.com en Cloudflare. Vive bajo /mkt porque el dominio es del
 // sitio publico, pero lo que administra es la zona entera de la plataforma:
 // los 17 hostnames de DNS-CLOUDFLARE-roombir.md salen de los .env.production.
@@ -238,6 +244,9 @@ app.use("/public/mkt/nps", publicNpsRouter);
 // El montaje de la voz en off del video de portada. No lo llama el navegador:
 // lo llaman las API routes de mkt-renderer con X-Internal-Secret.
 app.use("/public/mkt/video-vo", publicVideoVoRouter);
+// Eventos del sitio de marca. Tampoco lo llama el navegador: lo llama el proxy
+// /api/track de mkt-renderer, que pone el secret, el pais y el navegador.
+app.use("/public/mkt/events", publicMktEventsRouter);
 app.use("/s", publicSiteRouter);
 
 // Hubs propios de la vista /global (event-list.md §1 a §5): escritos a mano,
