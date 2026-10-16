@@ -41,6 +41,9 @@ function ev(t: string, sid: string, data: Record<string, unknown>, extra: Record
     route: "home",
     locale: "es",
     device: "mobile",
+    // Como el proxy: país y provincia van en todos los eventos del lote.
+    country: "AR",
+    region: sid === "s2" ? "Mendoza" : "Córdoba",
     data,
     ...extra,
   };
@@ -92,6 +95,13 @@ async function contract() {
   check("altas", t.signups === 1 && t.converted === 1, t);
   check("rebote: s2 (1 página, sin clics, 3 s)", t.bounced >= 1, t);
   check("canales", o.channels.some((c: { key: string }) => c.key === "paid") && o.channels.some((c: { key: string }) => c.key === "search"), o.channels);
+  check(
+    "provincias por país",
+    o.regions.length === 2 &&
+      o.regions[0].region === "Córdoba" && o.regions[0].sessions === 2 &&
+      o.regions[1].region === "Mendoza" && o.regions[1].country === "AR",
+    o.regions,
+  );
   check("campaña", o.campaigns.some((c: { key: string }) => c.key === "fundadores"), o.campaigns);
   const home = o.pages.find((p: { route: string }) => p.route === "home");
   check("página: atención media por vista", home?.avgEngagedMs === Math.round((42_000 + 3000) / 2), home);

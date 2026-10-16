@@ -47,6 +47,8 @@ const mktSiteEventSchema = new Schema(
     /** Primera visita de este navegador (la sesión que lo trajo). */
     newVisitor: { type: Boolean, default: false },
     country: { type: String, default: null },
+    /** Provincia o estado (DB-IP en el proxy del sitio). Nombre, no código. */
+    region: { type: String, default: null },
     device: { type: String, default: null },
     browser: { type: String, default: null },
     os: { type: String, default: null },

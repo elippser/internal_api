@@ -103,6 +103,7 @@ const eventSchema = Joi.object({
   landing: optStr(300),
   newVisitor: Joi.boolean(),
   country: optStr(2),
+  region: optStr(80),
   device: Joi.string().valid("mobile", "tablet", "desktop").allow(null),
   browser: optStr(30),
   os: optStr(30),
@@ -232,6 +233,7 @@ function sessionStages(r: Range): PipelineStage[] {
         landingPath: { $first: "$path" },
         locale: { $first: "$locale" },
         country: { $first: "$country" },
+        region: { $first: "$region" },
         device: { $first: "$device" },
         browser: { $first: "$browser" },
         os: { $first: "$os" },
@@ -286,6 +288,35 @@ function breakdown(field: string, limit = 12): PipelineStage.FacetPipelineStage[
       $project: {
         _id: 0,
         key: "$_id",
+        sessions: 1,
+        visitors: { $size: "$visitors" },
+        conversions: 1,
+        bounced: 1,
+      },
+    },
+  ];
+}
+
+/** Sesiones por provincia o estado, con su país: la misma provincia puede existir en dos. */
+function regionBreakdown(limit = 400): PipelineStage.FacetPipelineStage[] {
+  return [
+    { $match: { country: { $ne: null } } },
+    {
+      $group: {
+        _id: { country: "$country", region: { $ifNull: ["$region", null] } },
+        sessions: { $sum: 1 },
+        visitors: { $addToSet: "$vid" },
+        conversions: { $sum: "$converted" },
+        bounced: { $sum: "$bounced" },
+      },
+    },
+    { $sort: { sessions: -1 } },
+    { $limit: limit },
+    {
+      $project: {
+        _id: 0,
+        country: "$_id.country",
+        region: "$_id.region",
         sessions: 1,
         visitors: { $size: "$visitors" },
         conversions: 1,
@@ -360,6 +391,7 @@ export async function overview(r: Range) {
         campaigns: breakdown("$utm.campaign"),
         utmSources: breakdown("$utm.source"),
         countries: breakdown("$country", 250),
+        regions: regionBreakdown(),
         devices: breakdown("$device"),
         locales: breakdown("$locale"),
         browsers: breakdown("$browser"),
@@ -400,6 +432,7 @@ export async function overview(r: Range) {
     campaigns: sessionFacets?.campaigns ?? [],
     utmSources: sessionFacets?.utmSources ?? [],
     countries: sessionFacets?.countries ?? [],
+    regions: sessionFacets?.regions ?? [],
     devices: sessionFacets?.devices ?? [],
     locales: sessionFacets?.locales ?? [],
     browsers: sessionFacets?.browsers ?? [],
@@ -634,6 +667,7 @@ export async function realtime() {
         path: { $last: "$path" },
         route: { $last: "$route" },
         country: { $last: "$country" },
+        region: { $last: "$region" },
         device: { $last: "$device" },
         channel: { $first: "$channel" },
         last: { $max: "$at" },
@@ -641,7 +675,7 @@ export async function realtime() {
     },
     { $sort: { last: -1 } },
     { $limit: 50 },
-    { $project: { _id: 0, sid: "$_id", vid: 1, path: 1, route: 1, country: 1, device: 1, channel: 1, last: 1 } },
+    { $project: { _id: 0, sid: "$_id", vid: 1, path: 1, route: 1, country: 1, region: 1, device: 1, channel: 1, last: 1 } },
   ]);
   return { active: new Set(rows.map((x) => x.vid)).size, sessions: rows };
 }
@@ -652,7 +686,7 @@ export async function recentSessions(r: Range, limit = 40) {
     ...sessionStages(r),
     { $sort: { start: -1 } },
     { $limit: Math.min(Math.max(limit, 1), 100) },
-    { $project: { sid: "$_id", _id: 0, vid: 1, start: 1, channel: 1, refHost: 1, utm: 1, landing: 1, landingPath: 1, country: 1, device: 1, browser: 1, locale: 1, pageviews: 1, clicks: 1, engagedMs: 1, converted: 1, lead: 1, signup: 1, newVisitor: 1, bounced: 1 } },
+    { $project: { sid: "$_id", _id: 0, vid: 1, start: 1, channel: 1, refHost: 1, utm: 1, landing: 1, landingPath: 1, country: 1, region: 1, device: 1, browser: 1, locale: 1, pageviews: 1, clicks: 1, engagedMs: 1, converted: 1, lead: 1, signup: 1, newVisitor: 1, bounced: 1 } },
   ]);
   return sessions;
 }
