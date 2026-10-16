@@ -359,7 +359,7 @@ export async function overview(r: Range) {
         sources: breakdown("$refHost"),
         campaigns: breakdown("$utm.campaign"),
         utmSources: breakdown("$utm.source"),
-        countries: breakdown("$country", 15),
+        countries: breakdown("$country", 250),
         devices: breakdown("$device"),
         locales: breakdown("$locale"),
         browsers: breakdown("$browser"),
