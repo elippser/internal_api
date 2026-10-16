@@ -10,6 +10,7 @@ import {
   type LeadStatus,
 } from "./leads.model";
 import { screen, type ScreeningInput } from "./leads.screening";
+import { channelOf } from "../mktanalytics/mktanalytics.service";
 
 /**
  * El circuito completo del alta.
@@ -129,6 +130,8 @@ export interface CaptureInput {
   siteId?: string;
   utm?: Record<string, string>;
   referer?: string;
+  /** Visitante y sesion del sitio (telemetria), si el formulario los mando. */
+  attribution?: { vid?: string; sid?: string; landing?: string; refHost?: string };
   honeypot?: string;
   elapsedMs?: number | null;
   interacted?: boolean;
@@ -229,16 +232,34 @@ export const leadsService = {
       screening: { score: verdict.score, flags },
     };
 
+    const att = input.attribution ?? {};
+    const attribution = {
+      vid: att.vid ?? "",
+      sid: att.sid ?? "",
+      landing: att.landing ?? "",
+      refHost: att.refHost ?? "",
+      // La misma regla de canal que el tablero de Trafico: un lead y la sesion
+      // del sitio de la que salio caen en el mismo canal.
+      channel: channelOf(att.refHost || null, {
+        source: base.utm.utm_source,
+        medium: base.utm.utm_medium,
+      }),
+    };
+
     const existing = await Lead.findOne({ email }).sort({ createdAt: -1 });
+    // Primer contacto: el que vuelve a mandar el formulario no cambia de donde vino.
+    const withAttribution = existing?.attribution?.vid || existing?.attribution?.channel
+      ? base
+      : { ...base, attribution };
 
     // ---- Basura: se guarda para poder medirla, pero no dispara nada ----
     if (verdict.drop) {
       if (existing) {
-        existing.set({ ...base, status: "spam" as LeadStatus, statusChangedAt: new Date() });
+        existing.set({ ...withAttribution, status: "spam" as LeadStatus, statusChangedAt: new Date() });
         existing.submissions = (existing.submissions ?? 0) + 1;
         await existing.save();
       } else {
-        await Lead.create({ ...base, leadId: makeId("lead"), status: "spam" });
+        await Lead.create({ ...withAttribution, leadId: makeId("lead"), status: "spam" });
       }
       console.warn(`[leads] descartado por el filtro: ${email} flags=${flags.join(",")}`);
       return "dropped";
@@ -254,7 +275,7 @@ export const leadsService = {
         await existing.save();
       } else {
         await Lead.create({
-          ...base,
+          ...withAttribution,
           leadId: makeId("lead"),
           status: "registered",
           registeredAt: new Date(),
@@ -278,14 +299,14 @@ export const leadsService = {
     if (lead) {
       const lastSent = lead.invite?.lastSentAt?.getTime() ?? 0;
       const cooling = Date.now() - lastSent < resendCooldownMs();
-      lead.set({ ...base, status: lead.status === "spam" ? "new" : lead.status });
+      lead.set({ ...withAttribution, status: lead.status === "spam" ? "new" : lead.status });
       lead.submissions = (lead.submissions ?? 0) + 1;
       await lead.save();
       // Dentro de la ventana no sale otro mail. El anterior sigue siendo valido,
       // asi que el visitante no queda sin acceso: solo no recibe dos correos.
       if (cooling) return "throttled";
     } else {
-      lead = await Lead.create({ ...base, leadId: makeId("lead") });
+      lead = await Lead.create({ ...withAttribution, leadId: makeId("lead") });
     }
 
     await leadsService.issueInvite(lead.leadId);

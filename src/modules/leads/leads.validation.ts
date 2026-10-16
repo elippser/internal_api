@@ -71,6 +71,18 @@ export const captureLeadSchema = Joi.object({
   siteId: Joi.string().allow("").max(80).default(""),
   utm,
   referer: Joi.string().allow("").max(500).default(""),
+  /**
+   * El visitante del sitio que mando el formulario: los mismos `vid`/`sid` de
+   * la telemetria (`mkt_site_events`) y la atribucion de la sesion en la que
+   * entro. Es lo que une el lead con su recorrido previo en el sitio. Son ids
+   * al azar del navegador, nada que identifique a la persona.
+   */
+  attribution: Joi.object({
+    vid: Joi.string().max(64).pattern(/^[a-z0-9]+$/).allow(""),
+    sid: Joi.string().max(64).pattern(/^[a-z0-9]+$/).allow(""),
+    landing: Joi.string().allow("").max(300),
+    refHost: Joi.string().allow("").max(200),
+  }).default({}),
 
   // ---- Senales del filtro (las manda el formulario, no la persona) ----
   /** Campo trampa. Un humano no lo ve; un bot lo completa. */

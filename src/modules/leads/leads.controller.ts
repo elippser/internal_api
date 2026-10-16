@@ -94,6 +94,7 @@ export const leadsController = {
           siteId: value.siteId,
           utm: value.utm,
           referer: value.referer,
+          attribution: value.attribution,
           honeypot: value.website,
           elapsedMs: value.elapsedMs,
           interacted: value.interacted,

@@ -140,6 +140,19 @@ const leadSchema = new Schema(
     // ---- Atribucion ----
     utm: { type: Schema.Types.Mixed, default: {} },
     referer: { type: String, default: "", maxlength: 500 },
+    /**
+     * Primer contacto en el sitio: el visitante (`vid`) y la sesion (`sid`) de la
+     * telemetria, la pagina por la que entro y su canal calculado con la misma
+     * regla que el tablero de Trafico. Se fija en el PRIMER envio y no se pisa:
+     * el que vuelve a pedir el acceso no cambia de donde vino.
+     */
+    attribution: {
+      vid: { type: String, default: "", index: true },
+      sid: { type: String, default: "" },
+      landing: { type: String, default: "" },
+      refHost: { type: String, default: "" },
+      channel: { type: String, default: "" },
+    },
 
     // ---- Contexto del envio (para el filtro y para el soporte) ----
     capture: {

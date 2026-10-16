@@ -12,6 +12,7 @@ import {
   recentSessions,
   sessionTimeline,
 } from "./mktanalytics.service";
+import { journey, JOURNEY_GROUPS, type JourneyGroup } from "./journey.service";
 
 /**
  * Ingesta del sitio de marca. No la llama el navegador: la llama el proxy
@@ -46,6 +47,17 @@ function handleErr(res: Response, err: unknown) {
 mktAnalyticsRouter.get("/overview", async (req, res) => {
   try {
     return ok(res, await overview(parseRange(req.query as Record<string, string>)));
+  } catch (err) {
+    return handleErr(res, err);
+  }
+});
+
+/** El recorrido de alta: del sitio al final del onboarding (`journey.service`). */
+mktAnalyticsRouter.get("/journey", async (req, res) => {
+  const q = req.query as Record<string, string>;
+  const group = (JOURNEY_GROUPS as readonly string[]).includes(q.group) ? (q.group as JourneyGroup) : "channel";
+  try {
+    return ok(res, await journey(parseRange(q), group));
   } catch (err) {
     return handleErr(res, err);
   }
