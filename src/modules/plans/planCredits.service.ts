@@ -127,6 +127,7 @@ interface SelectedPlanSnapshot {
     iaMonthlyCredits?: number | null;
     iaResetDayUTC?: number | null;
     iaMonthlyImages?: number | null;
+    iaMonthlyVideos?: number | null;
   };
 }
 
@@ -165,6 +166,71 @@ function imageQuotaMessage(q: CompanyImageQuota): string {
     default:
       return "";
   }
+}
+
+export type VideoQuotaReason = "ok" | "no_plan" | "ia_not_in_plan" | "no_videos" | "enforcement_off";
+
+/** Cupo de videos de Roombir IA del período vigente. Misma forma que el de imágenes. */
+export interface CompanyVideoQuota {
+  companyId: string;
+  allowed: boolean;
+  reason: VideoQuotaReason;
+  monthlyVideos: number;
+  used: number;
+  remaining: number;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+  planName: string | null;
+  message: string;
+}
+
+function videoQuotaMessage(q: CompanyVideoQuota): string {
+  switch (q.reason) {
+    case "no_plan":
+      return "Esta cuenta todavía no tiene un plan asignado. Elegí un plan para generar videos con Roombir IA.";
+    case "ia_not_in_plan":
+      return "El plan de esta cuenta no incluye Roombir IA.";
+    case "no_videos": {
+      if (q.monthlyVideos === 0) {
+        return `El plan ${q.planName ?? "actual"} no incluye generación de videos. Cambiá de plan para habilitarla.`;
+      }
+      const reset = q.periodEnd
+        ? new Date(q.periodEnd).toLocaleDateString("es-AR", { timeZone: "UTC" })
+        : "el próximo período";
+      return `Se usaron los ${q.monthlyVideos} videos del período. El cupo se renueva el ${reset}.`;
+    }
+    default:
+      return "";
+  }
+}
+
+/**
+ * Cupo contado por filas del ledger (imágenes y videos): una fila de `source`
+ * en el período = una unidad consumida. Lo comparten los dos chequeos de abajo.
+ */
+async function countedQuota(
+  companyId: string,
+  pickLimit: (limits: SelectedPlanSnapshot["limits"] | undefined) => number | null | undefined,
+  source: "image_generation" | "video_generation",
+) {
+  const resolved = companyId ? await resolveCompanyPlan(companyId) : null;
+  if (!resolved) return { state: "no_plan" as const };
+  if (!resolved.iaIncluded) return { state: "ia_not_in_plan" as const, planName: resolved.planName };
+  const { plan, snapshot } = resolved;
+  const monthly = pickLimit(plan?.limits as SelectedPlanSnapshot["limits"]) ?? pickLimit(snapshot.limits) ?? 0;
+  const resetDay = plan?.limits?.iaResetDayUTC ?? snapshot.limits?.iaResetDayUTC ?? 1;
+  const { start, end } = currentPeriod(resetDay);
+  const used = await usageService.countRecords(companyId, source, start, new Date());
+  return {
+    state: "counted" as const,
+    planName: resolved.planName,
+    monthly,
+    used,
+    remaining: Math.max(0, monthly - used),
+    blocked: used >= monthly,
+    start,
+    end,
+  };
 }
 
 /**
@@ -330,44 +396,66 @@ export const planCreditsService = {
       planName: null,
       message: "",
     };
-    const resolved = companyId ? await resolveCompanyPlan(companyId) : null;
-
-    let quota: CompanyImageQuota;
-    if (!resolved) {
-      quota = base;
-    } else if (!resolved.iaIncluded) {
-      quota = { ...base, reason: "ia_not_in_plan", planName: resolved.planName };
-    } else {
-      const { plan, snapshot } = resolved;
-      const monthlyImages =
-        plan?.limits?.iaMonthlyImages ?? snapshot.limits?.iaMonthlyImages ?? 0;
-      const resetDay =
-        plan?.limits?.iaResetDayUTC ?? snapshot.limits?.iaResetDayUTC ?? 1;
-      const { start, end } = currentPeriod(resetDay);
-      const used = await usageService.countRecords(
-        companyId,
-        "image_generation",
-        start,
-        new Date(),
-      );
-      const blocked = used >= monthlyImages;
-      quota = {
-        ...base,
-        allowed: !blocked,
-        reason: blocked ? "no_images" : "ok",
-        monthlyImages,
-        used,
-        remaining: Math.max(0, monthlyImages - used),
-        periodStart: start,
-        periodEnd: end,
-        planName: resolved.planName,
-      };
-    }
+    const r = await countedQuota(companyId, (l) => l?.iaMonthlyImages, "image_generation");
+    const quota: CompanyImageQuota =
+      r.state === "no_plan"
+        ? base
+        : r.state === "ia_not_in_plan"
+          ? { ...base, reason: "ia_not_in_plan", planName: r.planName }
+          : {
+              ...base,
+              allowed: !r.blocked,
+              reason: r.blocked ? "no_images" : "ok",
+              monthlyImages: r.monthly,
+              used: r.used,
+              remaining: r.remaining,
+              periodStart: r.start,
+              periodEnd: r.end,
+              planName: r.planName,
+            };
 
     if (!iaEnforcementOn()) {
       return { ...quota, allowed: true, reason: "enforcement_off", message: "" };
     }
     return { ...quota, message: quota.allowed ? "" : imageQuotaMessage(quota) };
+  },
+
+  /** Cupo de videos del período vigente. Misma regla que el de imágenes. */
+  async checkVideoQuota(companyId: string): Promise<CompanyVideoQuota> {
+    const base: CompanyVideoQuota = {
+      companyId,
+      allowed: false,
+      reason: "no_plan",
+      monthlyVideos: 0,
+      used: 0,
+      remaining: 0,
+      periodStart: null,
+      periodEnd: null,
+      planName: null,
+      message: "",
+    };
+    const r = await countedQuota(companyId, (l) => l?.iaMonthlyVideos, "video_generation");
+    const quota: CompanyVideoQuota =
+      r.state === "no_plan"
+        ? base
+        : r.state === "ia_not_in_plan"
+          ? { ...base, reason: "ia_not_in_plan", planName: r.planName }
+          : {
+              ...base,
+              allowed: !r.blocked,
+              reason: r.blocked ? "no_videos" : "ok",
+              monthlyVideos: r.monthly,
+              used: r.used,
+              remaining: r.remaining,
+              periodStart: r.start,
+              periodEnd: r.end,
+              planName: r.planName,
+            };
+
+    if (!iaEnforcementOn()) {
+      return { ...quota, allowed: true, reason: "enforcement_off", message: "" };
+    }
+    return { ...quota, message: quota.allowed ? "" : videoQuotaMessage(quota) };
   },
 
   /** Balance de varias companies (dashboard del plan en el panel interno). */

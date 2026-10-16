@@ -247,6 +247,19 @@ function section5Tools(agent: AgentLike): string {
     "  historial) en sourceImageUrls.",
     "- Nunca generes imagenes que se hagan pasar por fotos reales del alojamiento",
     "  sin avisarlo: si es para publicar, recorda que es una imagen generada.",
+    "",
+    "## Generar videos",
+    "Podes CREAR videos cortos (4, 6 u 8 segundos) con generate_video: reels,",
+    "historias, clips para el sitio, o dar movimiento a una foto del alojamiento",
+    "(pasala como attachmentIndex o sourceImageUrl).",
+    "- 9:16 para reels e historias, 16:9 para el sitio. 6 segundos si no dicen nada.",
+    "- Sin sonido salvo que lo pidan o sea para publicar tal cual (cuesta mas).",
+    "- Cada video descuenta del cupo mensual del plan y tarda cerca de un minuto:",
+    "  uno por pedido. Si la tool responde que no hay cupo, decilo tal cual.",
+    "- Antes de llamarla avisa en una linea que lo estas generando y que tarda un",
+    "  minuto. El video aparece solo en el chat: no pegues la URL.",
+    "- Para animar una imagen que generaste antes, pasa su URL del historial.",
+    "- Mismo cuidado que con imagenes: si es para publicar, recorda que es generado.",
   ].join("\n");
 }
 

@@ -13,6 +13,7 @@ import {
   ADD_IMAGE_TO_LIBRARY_TOOL_SCHEMA,
   CAPTURE_FEEDBACK_TOOL_SCHEMA,
   GENERATE_IMAGE_TOOL_SCHEMA,
+  GENERATE_VIDEO_TOOL_SCHEMA,
   LOAD_SKILL_TOOL_SCHEMA,
   executeTool,
   resolveTools,
@@ -59,6 +60,15 @@ import {
   type ImageAspectRatio,
   type ReferenceImage,
 } from "./imageGeneration.service";
+import {
+  generateVideo,
+  uploadVideoToCloudinary,
+  VideoGenerationError,
+  isVideoAspectRatio,
+  normalizeVideoDuration,
+  type FirstFrame,
+  type VideoAspectRatio,
+} from "./videoGeneration.service";
 import { planCreditsService } from "../../plans/planCredits.service";
 import { usageService } from "../../usage/usage.service";
 
@@ -260,9 +270,9 @@ export interface StepEvent {
   label: string;
   status?: "ok" | "error";
   /**
-   * Datos para que el cliente dibuje el paso mientras corre. Hoy sólo
-   * `generate_image` lo usa: manda la proporción para que el loader ocupe el
-   * mismo lugar que después ocupa la imagen, sin salto al llegar.
+   * Datos para que el cliente dibuje el paso mientras corre. Lo usan
+   * `generate_image` y `generate_video`: mandan la proporción para que el loader
+   * ocupe el mismo lugar que después ocupa el medio, sin salto al llegar.
    */
   detail?: Record<string, unknown>;
 }
@@ -304,6 +314,7 @@ const INTERNAL_TOOL_NAMES = new Set([
   "capture_feedback_request",
   "add_image_to_library",
   "generate_image",
+  "generate_video",
   PROPOSE_GROWTH_PLAN,
   CONSULTAR_ESTADO_TURISTICO,
 ]);
@@ -332,6 +343,7 @@ function stepLabelForTool(toolName: string): string {
   if (n === CONSULTAR_ESTADO_TURISTICO || n === TOURISM_STATUS_BLOCK) return TOURISM_STEP_LABEL;
   if (n === "add_image_to_library") return "Guardando en la librería…";
   if (n === "generate_image") return "Generando la imagen…";
+  if (n === "generate_video") return "Generando el video…";
   if (n === "load_skill") return "Repasando el procedimiento…";
   // Las crudas primero: `write_booking_api` matcheaba /booking/ más abajo y el
   // usuario veía "Buscando reservas…" mientras el agente intentaba cambiar la
@@ -526,10 +538,11 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   // tenga cupo: así el modelo puede contestar "tu plan no incluye imágenes" en
   // vez de decir que no sabe dibujar.
   if (session.context.userId && !input.planContext && profile.id !== "turistico") {
-    tools.push(GENERATE_IMAGE_TOOL_SCHEMA);
+    tools.push(GENERATE_IMAGE_TOOL_SCHEMA, GENERATE_VIDEO_TOOL_SCHEMA);
   }
-  // Cuántas imágenes generó este turno (tope por turno, ver handleGenerateImage).
+  // Cuántas imágenes y videos generó este turno (topes por turno, ver los handlers).
   const imageTurn = { count: 0 };
+  const videoTurn = { count: 0 };
   // Sin habilidades visibles la tool no tiene nada que cargar: ofrecerla igual
   // sólo invita al modelo a llamarla y recibir un error.
   if (input.hasSkills) {
@@ -904,7 +917,9 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
         label,
         ...(block.name === "generate_image"
           ? { detail: { aspectRatio: block.input?.aspectRatio ?? "1:1" } }
-          : {}),
+          : block.name === "generate_video"
+            ? { detail: { aspectRatio: isVideoAspectRatio(block.input?.aspectRatio) ? block.input.aspectRatio : "16:9" } }
+            : {}),
       });
       const handled = await handleToolCall(
         block,
@@ -918,12 +933,14 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
           planContext: input.planContext,
           tourismTool: input.tourismTool,
           imageTurn,
+          videoTurn,
         },
       );
-      // La imagen generada viaja ya en el tool_done: el chat la revela apenas
-      // está, mientras el modelo todavía escribe su línea de cierre.
+      // La imagen (o el video) generado viaja ya en el tool_done: el chat lo
+      // revela apenas está, mientras el modelo todavía escribe su línea de cierre.
       const imageCard =
-        block.name === "generate_image" && handled.execMeta.outcome === "success"
+        (block.name === "generate_image" || block.name === "generate_video") &&
+        handled.execMeta.outcome === "success"
           ? (handled.execMeta.result as Record<string, unknown> | undefined)
           : undefined;
       input.onStep?.({
@@ -1138,6 +1155,7 @@ interface ToolCallExtras {
   planContext?: PlanToolContext;
   tourismTool?: TourismToolContext;
   imageTurn?: { count: number };
+  videoTurn?: { count: number };
 }
 
 async function handleToolCall(
@@ -1158,6 +1176,11 @@ async function handleToolCall(
   // ---- Tool interna: generate_image ----
   if (block.name === "generate_image") {
     return handleGenerateImage(block, agent, session, extras);
+  }
+
+  // ---- Tool interna: generate_video ----
+  if (block.name === "generate_video") {
+    return handleGenerateVideo(block, agent, session, extras);
   }
 
   // ---- Tool interna: propose_growth_plan (turno estratégico) ----
@@ -1902,6 +1925,208 @@ async function handleGenerateImage(
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error desconocido";
     return fail(`Generé la imagen pero no pude guardarla en la librería: ${msg}`, `library_error: ${msg}`);
+  }
+}
+
+/**
+ * Videos por mensaje. Uno cuesta 5-10 veces una imagen y tarda un minuto: dos
+ * alcanzan para "uno vertical y uno horizontal" y frenan un loop caro.
+ */
+const MAX_VIDEOS_PER_TURN = 2;
+
+// Tool interna: genera un video corto, lo sube a Cloudinary y lo registra en la
+// librería de la company. Mismo orden que handleGenerateImage: todo lo que puede
+// decir "no" va ANTES de generar, y el consumo se registra apenas hay video.
+async function handleGenerateVideo(
+  block: any,
+  agent: AgentLike,
+  session: SessionLike,
+  extras: ToolCallExtras,
+): Promise<ToolHandleResult> {
+  const start = Date.now();
+  const input = (block.input ?? {}) as Record<string, unknown>;
+  const mk = (
+    outcome: ToolExecutionMeta["outcome"],
+    result?: unknown,
+    errorMessage?: string,
+  ): ToolExecutionMeta => ({
+    toolId: "internal-video",
+    toolName: "generate_video",
+    inputArgs: input,
+    outcome,
+    result,
+    errorMessage,
+    durationMs: Date.now() - start,
+    retried: false,
+  });
+  const fail = (message: string, reason: string, code?: string): ToolHandleResult => ({
+    output: { error: true, ...(code ? { code } : {}), message },
+    execMeta: mk("error", undefined, reason),
+  });
+
+  const prompt = typeof input.prompt === "string" ? input.prompt.trim() : "";
+  if (!prompt) return fail("Falta la descripción del video (prompt).", "empty_prompt");
+  const aspectRatio: VideoAspectRatio = isVideoAspectRatio(input.aspectRatio)
+    ? input.aspectRatio
+    : "16:9";
+  const durationSeconds = normalizeVideoDuration(input.durationSeconds);
+  const withAudio = input.withAudio === true;
+
+  const { userId, companyId, propertyId } = session.context;
+  if (!userId || !companyId) {
+    return fail("No puedo identificar al usuario para generar el video.", "no_user");
+  }
+
+  // El video queda en la librería: sin permiso de escritura ahí, no se genera.
+  if (extras.scope) {
+    let scope = extras.scope;
+    if (!scope.resolved && process.env.AGENT_JWT_SECRET) {
+      scope = await resolveUserScope(process.env.AGENT_JWT_SECRET, userId, companyId, { force: true });
+    }
+    const access = evaluateAccess(scope, {
+      service: "pms-core",
+      method: "POST",
+      path: "/asset-library/files",
+    });
+    if (!access.allowed) {
+      return fail(
+        access.message ?? "No tenés permiso para guardar archivos en la librería, que es donde queda el video.",
+        `${access.code}: ${access.reason}`,
+        access.code,
+      );
+    }
+  }
+
+  const turn = extras.videoTurn ?? { count: 0 };
+  if (turn.count >= MAX_VIDEOS_PER_TURN) {
+    return fail(
+      `Ya generé ${MAX_VIDEOS_PER_TURN} videos en este mensaje. Mostrale estos al usuario y, si quiere más, que lo pida en otro mensaje.`,
+      "turn_cap",
+      "video_turn_cap",
+    );
+  }
+
+  const quota = await planCreditsService.checkVideoQuota(companyId);
+  if (!quota.allowed) {
+    return fail(quota.message, `video_quota: ${quota.reason}`, "video_quota_exceeded");
+  }
+
+  // Foto a animar: un adjunto de este turno o una URL https anterior.
+  let firstFrame: FirstFrame | undefined;
+  const hasIdx = input.attachmentIndex !== undefined && input.attachmentIndex !== null;
+  const srcUrl = typeof input.sourceImageUrl === "string" ? input.sourceImageUrl.trim() : "";
+  if (hasIdx) {
+    const att = extras.attachments[Number(input.attachmentIndex)];
+    if (att?.kind === "image") firstFrame = { mediaType: att.mediaType, dataB64: att.dataB64 };
+  } else if (/^https:\/\//i.test(srcUrl)) {
+    firstFrame = { mediaType: "image/jpeg", url: srcUrl };
+  }
+  if ((hasIdx || srcUrl) && !firstFrame) {
+    return fail(
+      "No encontré la foto a animar: no hay una imagen adjunta en esa posición ni una URL https válida.",
+      "reference_not_found",
+    );
+  }
+
+  turn.count += 1;
+  let video;
+  try {
+    video = await generateVideo({ prompt, aspectRatio, durationSeconds, withAudio, firstFrame });
+  } catch (err) {
+    // No se descuenta: sin video no hubo consumo que cobrar.
+    turn.count -= 1;
+    const e = err instanceof VideoGenerationError ? err : null;
+    const message =
+      e?.code === "refused"
+        ? `El modelo de video no generó este video (${e.message}). Probá reformular el pedido.`
+        : `No pude generar el video: ${e?.message ?? "error desconocido"}. Intentá de nuevo en un momento.`;
+    return fail(message, `video_error: ${(err as Error)?.message}`, e?.code ?? "video_error");
+  }
+
+  try {
+    await usageService.record({
+      source: "video_generation",
+      agentId: agent.agentId,
+      model: video.model,
+      companyId,
+      propertyId: propertyId ?? null,
+      userId,
+      userRole: session.context.userRole ?? null,
+      conversationId: session.sessionId,
+      sessionId: session.sessionId,
+      // Tokens en cero: el video tiene su propio cupo. El costo real va en costUsd.
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: video.costUsd,
+      latencyMs: video.ms,
+      toolCallCount: 1,
+      occurredAt: new Date(),
+    });
+  } catch (err) {
+    console.error("[usage] no se pudo registrar el video generado:", err);
+  }
+
+  const name =
+    (typeof input.name === "string" && input.name.trim()) ||
+    `Roombir IA · ${prompt.slice(0, 48)}`;
+  try {
+    const uploaded = await uploadVideoToCloudinary(
+      video.bytes,
+      video.mediaType,
+      `roombir/library/${companyId}`,
+    );
+    const agentJwt = await mintAgentJwt({
+      userId,
+      companyId,
+      agentId: agent.agentId,
+      sessionId: session.sessionId,
+    });
+    const created = (await pmsRequest({
+      service: "pms-core",
+      method: "POST",
+      path: "/asset-library/files",
+      body: {
+        type: "video",
+        name,
+        url: uploaded.url,
+        mimeType: video.mediaType,
+        size: uploaded.bytes,
+        width: uploaded.width || (aspectRatio === "16:9" ? 1280 : 720),
+        height: uploaded.height || (aspectRatio === "16:9" ? 720 : 1280),
+        duration: uploaded.duration || durationSeconds,
+      },
+      agentJwt,
+    })) as any;
+    const file = created?.file ?? created;
+
+    const card = {
+      kind: "generated_video",
+      url: uploaded.url,
+      posterUrl: uploaded.posterUrl,
+      fileId: file?.fileId ?? null,
+      name,
+      prompt,
+      aspectRatio,
+      durationSeconds,
+      withAudio,
+      animated: Boolean(firstFrame),
+      remaining: quota.reason === "enforcement_off" ? null : Math.max(0, quota.remaining - 1),
+      monthlyVideos: quota.reason === "enforcement_off" ? null : quota.monthlyVideos,
+    };
+    return {
+      output: {
+        ok: true,
+        url: uploaded.url,
+        fileId: card.fileId,
+        videosLeftThisPeriod: card.remaining,
+        message:
+          "Video generado, guardado en la librería y ya visible en el chat. No repitas la URL: describí en una línea qué hiciste.",
+      },
+      execMeta: mk("success", card),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return fail(`Generé el video pero no pude guardarlo en la librería: ${msg}`, `library_error: ${msg}`);
   }
 }
 

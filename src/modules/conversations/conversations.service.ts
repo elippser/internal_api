@@ -918,9 +918,10 @@ export const conversationsService = {
   // Créditos de IA de la company (bolsa mensual de tokens): consumido vs total.
   // Es lo que el sidebar del chat muestra como "uso / restante".
   async getCredits(companyId: string | undefined) {
-    const [credits, images] = await Promise.all([
+    const [credits, images, videos] = await Promise.all([
       planCreditsService.getCompanyCredits(companyId ?? ""),
       planCreditsService.checkImageQuota(companyId ?? ""),
+      planCreditsService.checkVideoQuota(companyId ?? ""),
     ]);
     return {
       ...credits,
@@ -929,6 +930,11 @@ export const conversationsService = {
         monthlyImages: images.monthlyImages,
         used: images.used,
         remaining: images.remaining,
+      },
+      videos: {
+        monthlyVideos: videos.monthlyVideos,
+        used: videos.used,
+        remaining: videos.remaining,
       },
     };
   },
@@ -1239,13 +1245,12 @@ async function buildHistoryWindow(sessionId: string) {
   // luminosa" en el mensaje siguiente no tiene qué editar.
   return ordered.map((m) => {
     if (m.role === "assistant") {
-      const images = generatedImageUrls(m.agentMeta?.toolsExecuted);
-      return {
-        role: "assistant" as const,
-        content: images.length
-          ? `${m.content}\n\n[Imágenes generadas en este mensaje: ${images.join(" , ")}]`
-          : m.content,
-      };
+      const images = generatedMediaUrls(m.agentMeta?.toolsExecuted, "generate_image");
+      const videos = generatedMediaUrls(m.agentMeta?.toolsExecuted, "generate_video");
+      let content = m.content;
+      if (images.length) content += `\n\n[Imágenes generadas en este mensaje: ${images.join(" , ")}]`;
+      if (videos.length) content += `\n\n[Videos generados en este mensaje: ${videos.join(" , ")}]`;
+      return { role: "assistant" as const, content };
     }
     return {
       role: "user" as const,
@@ -1256,11 +1261,11 @@ async function buildHistoryWindow(sessionId: string) {
   });
 }
 
-function generatedImageUrls(executed: unknown): string[] {
+function generatedMediaUrls(executed: unknown, toolName: "generate_image" | "generate_video"): string[] {
   if (!Array.isArray(executed)) return [];
   const urls: string[] = [];
   for (const t of executed as Array<{ toolName?: string; outcome?: string; result?: any }>) {
-    if (t?.toolName !== "generate_image" || t.outcome !== "success") continue;
+    if (t?.toolName !== toolName || t.outcome !== "success") continue;
     const url = t.result?.url;
     if (typeof url === "string") urls.push(url);
   }

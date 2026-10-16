@@ -14,6 +14,9 @@ export const USAGE_SOURCES = [
   // cupo mensual del plan se cuenta con estas filas, y los tokens van en cero
   // para no descontar del cupo de texto (el costo real viaja en costUsd).
   "image_generation",
+  // Videos de Roombir IA (tool generate_video). Mismo criterio: una fila = un
+  // video, tokens en cero y el costo real en costUsd.
+  "video_generation",
 ] as const;
 export type UsageSource = (typeof USAGE_SOURCES)[number];
 

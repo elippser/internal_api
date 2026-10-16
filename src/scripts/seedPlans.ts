@@ -31,6 +31,7 @@ interface SeedPlan {
     maxUsers: number | null;
     iaMonthlyCredits: number | null;
     iaMonthlyImages: number | null;
+    iaMonthlyVideos: number | null;
   };
   order: number;
   highlighted: boolean;
@@ -50,7 +51,7 @@ const PLAN_SEED: SeedPlan[] = [
     // para siempre sin pagar.
     freeDurationDays: 30,
     trialDays: 0,
-    limits: { maxProperties: 1, maxUsers: 3, iaMonthlyCredits: 0, iaMonthlyImages: 10 },
+    limits: { maxProperties: 1, maxUsers: 3, iaMonthlyCredits: 0, iaMonthlyImages: 10, iaMonthlyVideos: 2 },
     order: 10,
     highlighted: false,
   },
@@ -77,7 +78,7 @@ const PLAN_SEED: SeedPlan[] = [
     free: false,
     freeDurationDays: null,
     trialDays: 14,
-    limits: { maxProperties: 3, maxUsers: 15, iaMonthlyCredits: 500000, iaMonthlyImages: 60 },
+    limits: { maxProperties: 3, maxUsers: 15, iaMonthlyCredits: 500000, iaMonthlyImages: 60, iaMonthlyVideos: 10 },
     order: 20,
     highlighted: true,
   },
@@ -107,7 +108,7 @@ const PLAN_SEED: SeedPlan[] = [
     free: false,
     freeDurationDays: null,
     trialDays: 14,
-    limits: { maxProperties: null, maxUsers: null, iaMonthlyCredits: 3000000, iaMonthlyImages: 200 },
+    limits: { maxProperties: null, maxUsers: null, iaMonthlyCredits: 3000000, iaMonthlyImages: 200, iaMonthlyVideos: 30 },
     order: 30,
     highlighted: false,
   },

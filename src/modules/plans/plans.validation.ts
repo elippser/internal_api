@@ -71,6 +71,7 @@ const limitsSchema = Joi.object({
   // no tendria periodo en febrero.
   iaResetDayUTC: Joi.number().integer().min(1).max(28),
   iaMonthlyImages: Joi.number().integer().min(0).max(100_000).allow(null),
+  iaMonthlyVideos: Joi.number().integer().min(0).max(100_000).allow(null),
 });
 
 const planBody = {

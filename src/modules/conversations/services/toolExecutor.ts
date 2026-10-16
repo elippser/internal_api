@@ -170,6 +170,64 @@ export const GENERATE_IMAGE_TOOL_SCHEMA: AnthropicTool = {
   },
 };
 
+// Tool interna manejada por el runtime: genera un video corto con un modelo de
+// video aparte (videoGeneration.service), lo guarda en la librería de la company
+// y lo devuelve para que el chat lo reproduzca. Cada llamada descuenta UN video
+// del cupo mensual del plan (`limits.iaMonthlyVideos`).
+// `durationSeconds` es number SIN enum a propósito: un enum numérico hace que
+// Gemini mande los argumentos vacíos (trampa 9 de la migración a OpenRouter).
+export const GENERATE_VIDEO_TOOL_SCHEMA: AnthropicTool = {
+  name: "generate_video",
+  description:
+    "Genera un video corto (4 a 8 segundos) y lo guarda en la librería de medios de la empresa. " +
+    "Usala cuando el usuario pida un video, un reel, una historia animada, un clip para redes o el sitio, " +
+    "o que le dé movimiento a una foto. Para ANIMAR una foto, pasala: attachmentIndex si la adjuntó en este " +
+    "mensaje, o sourceImageUrl si es una imagen anterior de la conversación o de la librería. " +
+    "Cada llamada consume UN video del cupo mensual del plan y tarda alrededor de un minuto: hacé uno solo " +
+    "por pedido y no la llames para probar. " +
+    "El video ya se muestra en el chat: no pegues su URL en la respuesta, contá en una línea qué hiciste.",
+  input_schema: {
+    type: "object",
+    properties: {
+      prompt: {
+        type: "string",
+        description:
+          "Descripción del video: escena, movimiento de cámara (paneo lento, avance suave, plano fijo), qué se " +
+          "mueve, luz, ambiente y sonido. Incluí los datos reales del alojamiento que correspondan (ciudad, " +
+          "paisaje, tipo de propiedad). Si anima una foto, describí sólo el movimiento.",
+      },
+      aspectRatio: {
+        type: "string",
+        enum: ["16:9", "9:16"],
+        description: "9:16 para reels, historias y TikTok; 16:9 para el sitio, YouTube o una portada.",
+      },
+      durationSeconds: {
+        type: "number",
+        description: "Duración: 4, 6 u 8 segundos. 6 si el usuario no dijo nada.",
+      },
+      withAudio: {
+        type: "boolean",
+        description:
+          "true para sumar sonido ambiente generado (viento, mar, pájaros, ciudad). Cuesta más: usalo sólo si el " +
+          "usuario lo pide o el video es para publicar tal cual en redes. Sin sonido por defecto.",
+      },
+      attachmentIndex: {
+        type: "number",
+        description: "Índice (base 0) de la imagen adjunta en ESTE mensaje que se va a animar.",
+      },
+      sourceImageUrl: {
+        type: "string",
+        description: "URL de una imagen ya existente (generada antes o de la librería) que se va a animar.",
+      },
+      name: {
+        type: "string",
+        description: "Nombre corto para el archivo en la librería (ej. 'Reel atardecer cabaña').",
+      },
+    },
+    required: ["prompt", "aspectRatio"],
+  },
+};
+
 // Tool interna manejada por el runtime: NIVEL 2 de la revelación progresiva
 // (§19). El prompt lista las habilidades disponibles con una línea cada una; el
 // cuerpo completo — el instructivo — se paga sólo cuando el modelo decide que lo

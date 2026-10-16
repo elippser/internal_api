@@ -100,6 +100,10 @@ const limitsSchema = new Schema(
     // `null` = sin asignar = 0: un plan viejo no genera imagenes hasta que
     // alguien le ponga un numero.
     iaMonthlyImages: { type: Number, default: null },
+    // Videos cortos (4-8 s) que Roombir IA puede generar por mes (tool
+    // `generate_video`). Cupo aparte: un video cuesta USD 0,12-0,40, diez
+    // veces una imagen. Mismo dia de reset; `null` = 0.
+    iaMonthlyVideos: { type: Number, default: null },
   },
   { _id: false },
 );
