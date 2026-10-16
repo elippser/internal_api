@@ -17,6 +17,20 @@
  * dejaria a una cuenta sin poder ni entrar a configurar su empresa.
  */
 
+/**
+ * Claves de producto que cambiaron de nombre. El rebrand Bookfer → Roombir
+ * renombró `bookfer-ia` a `roombir-ia` en los planes pero no en el documento
+ * del producto (la semilla sólo crea claves que faltan): los planes pedían una
+ * clave que no existía y `entitlementsOf` dejaba la IA afuera del snapshot de
+ * toda cuenta que elegía plan. Desde acá, la clave vieja vale como alias en
+ * los dos lados y la semilla la migra.
+ */
+export const PRODUCT_KEY_ALIASES: Readonly<Record<string, string>> = {
+  "bookfer-ia": "roombir-ia",
+};
+
+export const canonicalProductKey = (key: string): string => PRODUCT_KEY_ALIASES[key] ?? key;
+
 export interface SeedProduct {
   key: string;
   name: string;

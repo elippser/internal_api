@@ -8,7 +8,7 @@ import {
   type PlanStatus,
   type ProductStatus,
 } from "./plans.model";
-import { PRODUCT_SEED } from "./productCatalog";
+import { PRODUCT_KEY_ALIASES, PRODUCT_SEED, canonicalProductKey } from "./productCatalog";
 import {
   PLAN_PAGE_FIELD_KEYS,
   PLAN_PAGE_LOCALES,
@@ -108,6 +108,12 @@ export const productsService = {
    */
   async seed(userId = "seed") {
     let created = 0;
+    // Una clave renombrada se migra en su lugar (conserva lo editado a mano),
+    // en vez de dejar el documento viejo y sumar uno nuevo al lado.
+    for (const [oldKey, newKey] of Object.entries(PRODUCT_KEY_ALIASES)) {
+      const hasNew = await Product.exists({ key: newKey });
+      if (!hasNew) await Product.updateOne({ key: oldKey }, { $set: { key: newKey } });
+    }
     for (const item of PRODUCT_SEED) {
       const exists = await Product.findOne({ key: item.key }).lean();
       if (exists) continue;
@@ -246,10 +252,13 @@ export const plansService = {
       .sort({ order: 1, name: 1 })
       .lean();
 
-    const wanted = new Set<string>(plan.productKeys ?? []);
+    // Plan y catálogo se comparan por la clave canónica: un alias viejo en
+    // cualquiera de los dos lados no puede dejar un producto afuera.
+    const wanted = new Set<string>((plan.productKeys ?? []).map(canonicalProductKey));
     const included: any[] = [];
     const locked: any[] = [];
-    for (const p of products) {
+    for (const raw of products) {
+      const p = { ...raw, key: canonicalProductKey(raw.key) };
       if (p.core || wanted.has(p.key)) included.push(p);
       else locked.push(p);
     }
