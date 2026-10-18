@@ -4,6 +4,7 @@ import { authorize } from "../../shared/middleware/authorize";
 import { accessController } from "./access.controller";
 import { blocksController } from "./blocks.controller";
 import { shieldController } from "./shield.controller";
+import { roombierController } from "./roombier.controller";
 
 /**
  * `/api/v1/access/*` — quién entró a roombir, desde dónde y con qué equipo.
@@ -41,6 +42,8 @@ accessRouter.get("/users/:userId", accessController.getUser);
 accessRouter.get("/users/:userId/events", accessController.listUserEvents);
 accessRouter.get("/users/:userId/actions", accessController.listUserActions);
 accessRouter.get("/users/:userId/devices", accessController.listUserDevices);
+// Marca de roombier: da acceso de admin a cualquier hotel, así que es `admin`.
+accessRouter.patch("/users/:userId/roombier", authorize("admin"), roombierController.set);
 
 accessRouter.get("/summary", accessController.summary);
 accessRouter.get("/geo/points", accessController.geoPoints);

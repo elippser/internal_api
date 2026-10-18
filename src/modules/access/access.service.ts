@@ -67,6 +67,8 @@ export interface ListUsersInput {
   role?: string;
   status?: string;
   hasFlags: boolean;
+  /** Sólo roombiers (empleados de Roombir). */
+  roombier?: boolean;
   lastAccessFrom?: Date;
   lastAccessTo?: Date;
   page: number;
@@ -146,6 +148,9 @@ const USER_LIST_FIELDS = {
   lastAccessGeo: 1,
   lastDeviceId: 1,
   memberships: 1,
+  isRoombier: 1,
+  roombierGrantedAt: 1,
+  roombierGrantedBy: 1,
   activeCompanyId: 1,
 };
 
@@ -313,6 +318,7 @@ export const accessService = {
     }
     if (opts.role) and.push({ role: opts.role });
     if (opts.status) and.push({ status: opts.status });
+    if (opts.roombier) and.push({ isRoombier: true });
     if (opts.companyId) {
       // La pertenencia real es la membership; `activeCompanyId` cubre a los
       // usuarios viejos que todavía no la tienen escrita.
@@ -393,6 +399,7 @@ export const accessService = {
         avatar: u.avatar ?? null,
         role: u.role ?? null,
         status: u.status ?? null,
+        isRoombier: u.isRoombier === true,
         createdAt: u.createdAt ?? null,
         lastLoginAt: u.lastLoginAt ?? null,
         lastAccessAt: u.lastAccessAt ?? null,

@@ -55,6 +55,7 @@ export const listUsersSchema = Joi.object({
   role: Joi.string().max(40),
   status: Joi.string().max(40),
   hasFlags: Joi.boolean().truthy("true").falsy("false").default(false),
+  roombier: Joi.boolean().truthy("true").falsy("false").default(false),
   lastAccessFrom: Joi.date().iso(),
   lastAccessTo: Joi.date().iso(),
   page: Joi.number().integer().min(1).default(1),

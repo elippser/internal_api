@@ -148,6 +148,10 @@ export interface PmsUser {
   lastAccessAt?: Date;
   lastAccessGeo?: { country?: string; city?: string };
   lastDeviceId?: string;
+  /** Empleado de Roombir: la marca la escribe pms-core, acá sólo se lee. */
+  isRoombier?: boolean;
+  roombierGrantedAt?: Date | null;
+  roombierGrantedBy?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -230,6 +234,9 @@ const userSchema = new Schema(
     lastAccessAt: Date,
     lastAccessGeo: Schema.Types.Mixed,
     lastDeviceId: String,
+    isRoombier: Boolean,
+    roombierGrantedAt: Date,
+    roombierGrantedBy: String,
     createdAt: Date,
     updatedAt: Date,
   },
