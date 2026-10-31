@@ -29,6 +29,7 @@ import { usabilityRouter } from "./modules/usability/usability.router";
 import { workRouter } from "./modules/work/work.router";
 import { academyRouter } from "./modules/academy/academy.router";
 import { hotelsRouter } from "./modules/hotels/hotels.router";
+import { webStatsRouter } from "./modules/webStats/webStats.router";
 import { accessRouter } from "./modules/access/access.router";
 import { usageRouter } from "./modules/usage/usage.router";
 import { plansRouter, publicPlansRouter } from "./modules/plans/plans.router";
@@ -176,6 +177,7 @@ app.use(`${BASE}/tourism`, tourismRouter);
 app.use(`${BASE}/tickets`, ticketsRouter);
 app.use(`${BASE}/support-chat`, supportChatRouter);
 app.use(`${BASE}/hotels`, hotelsRouter);
+app.use(`${BASE}/web-stats`, webStatsRouter);
 app.use(`${BASE}/access`, accessRouter);
 app.use(`${BASE}/usage`, usageRouter);
 // Planes y productos comerciales. El PMS los consume via /plans/internal/*
