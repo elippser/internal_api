@@ -3,6 +3,7 @@ import Joi from "joi";
 import { authenticate } from "../../shared/middleware/authenticate";
 import { authorize, hasMinRole } from "../../shared/middleware/authorize";
 import { fail, ok } from "../../shared/utils/http";
+import { signUpload, SupportChatError } from "../supportChat/supportChat.service";
 import { PROJECT_STATUSES, TASK_PRIORITIES, TASK_STATUSES } from "./work.model";
 import { WorkError, workService, type Viewer } from "./work.service";
 
@@ -17,12 +18,27 @@ const projectFields = {
   startDate: day,
   targetDate: day,
 };
+// Solo imagenes servidas por nuestra cuenta de Cloudinary, igual que en el chat de soporte.
+const ownImage = (url: string, helpers: Joi.CustomHelpers) => {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  return url.startsWith(`https://res.cloudinary.com/${cloud ? `${cloud}/` : ""}`) ? url : helpers.error("any.invalid");
+};
+const attachment = Joi.object({
+  url: Joi.string().uri().max(1_000).custom(ownImage).required(),
+  name: text(200),
+  mime: Joi.string().pattern(/^image\//).max(100),
+  size: Joi.number().min(0),
+  width: Joi.number().min(0),
+  height: Joi.number().min(0),
+});
+
 const taskFields = {
   projectId: Joi.string().allow(null),
   details: text(50_000),
   priority: Joi.string().valid(...TASK_PRIORITIES),
   assigneeId: Joi.string().allow(null),
   dueDate: day,
+  attachments: Joi.array().items(attachment).max(10),
 };
 
 const schemas = {
@@ -59,7 +75,7 @@ function handle(fn: (req: Request, res: Response) => Promise<unknown>) {
     try {
       await fn(req, res);
     } catch (err) {
-      if (err instanceof WorkError) return fail(res, err.status, err.message);
+      if (err instanceof WorkError || err instanceof SupportChatError) return fail(res, err.status, err.message);
       console.error("[work]", err);
       return fail(res, 500, "Error interno");
     }
@@ -94,6 +110,8 @@ workRouter.delete("/projects/:id", manager, handle(async (req, res) => {
   await workService.deleteProject(req.params.id);
   return ok(res, { ok: true });
 }));
+
+workRouter.post("/uploads/sign", manager, handle(async (_req, res) => ok(res, signUpload("image", "work"))));
 
 workRouter.get("/tasks", handle(async (req, res) => ok(res, await workService.listTasks(viewer(req), valid(schemas.taskList, req.query)))));
 workRouter.post("/tasks", manager, handle(async (req, res) => ok(res, await workService.createTask(viewer(req), valid(schemas.taskCreate, req.body)), 201)));

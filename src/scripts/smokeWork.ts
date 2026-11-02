@@ -11,6 +11,9 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import type { AddressInfo } from "node:net";
 
 process.env.JWT_SECRET = "smoke";
+process.env.CLOUDINARY_CLOUD_NAME = "demo";
+process.env.CLOUDINARY_API_KEY = "key";
+process.env.CLOUDINARY_API_SECRET = "secret";
 
 let failures = 0;
 function check(name: string, cond: boolean, extra?: unknown): void {
@@ -115,6 +118,20 @@ async function main() {
   const ana = team.data.find((x: any) => x.userId === "ana");
   check("métricas por persona", ana.stats.done === 1 && ana.stats.avgScore === 4 && ana.stats.open === 1, ana);
   check("nunca expone contraseñas", !JSON.stringify(team.data).includes("passwordHash"));
+
+  // Ticket con imagenes
+  const img = { url: "https://res.cloudinary.com/demo/image/upload/v1/x.png", name: "x.png", mime: "image/png", size: 10, width: 4, height: 4 };
+  const sign = await call("jefe", "POST", "/uploads/sign");
+  check("admin firma subidas", sign.status === 200 && sign.data.uploadUrl.endsWith("/image/upload") && !JSON.stringify(sign.data).includes("secret"), sign);
+  check("empleado no firma subidas", (await call("ana", "POST", "/uploads/sign")).status === 403);
+  const ticket = await call("jefe", "POST", "/tasks", { title: "Ticket", details: "Con captura", priority: "urgent", assigneeId: "ana", attachments: [img] });
+  check("guarda las imagenes", ticket.status === 201 && ticket.data.attachments[0].url === img.url, ticket);
+  check("la persona las ve", (await call("ana", "GET", `/tasks/${ticket.data.taskId}`)).data.attachments.length === 1);
+  check("rechaza imagenes ajenas", (await call("jefe", "POST", "/tasks", { title: "Mala", attachments: [{ ...img, url: "https://evil.example/x.png" }] })).status === 400);
+  check("rechaza otra cuenta", (await call("jefe", "POST", "/tasks", { title: "Mala", attachments: [{ ...img, url: "https://res.cloudinary.com/otra/image/upload/x.png" }] })).status === 400);
+  check("tope de 10", (await call("jefe", "POST", "/tasks", { title: "Mala", attachments: Array(11).fill(img) })).status === 400);
+  check("empleado no cambia imagenes", (await call("ana", "PATCH", `/tasks/${ticket.data.taskId}`, { attachments: [] })).status === 403);
+  await call("jefe", "DELETE", `/tasks/${ticket.data.taskId}`);
 
   // Borrar un proyecto no pierde tareas
   await call("jefe", "DELETE", `/projects/${pid}`);

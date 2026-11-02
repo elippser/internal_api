@@ -38,6 +38,7 @@ async function decorateTasks(rows: Row[]) {
   const titles = new Map(projects.map((p) => [p.projectId, p.title]));
   return rows.map(({ _id, __v, ...t }) => ({
     ...t,
+    attachments: t.attachments ?? [],
     assigneeName: t.assigneeId ? (names.get(t.assigneeId) ?? null) : null,
     reviewedByName: t.reviewedBy ? (names.get(t.reviewedBy) ?? null) : null,
     projectTitle: t.projectId ? (titles.get(t.projectId) ?? null) : null,

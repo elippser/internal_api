@@ -14,6 +14,18 @@ const eventSchema = new Schema(
   { _id: false },
 );
 
+const attachmentSchema = new Schema(
+  {
+    url: { type: String, required: true },
+    name: { type: String, default: "" },
+    mime: { type: String, default: "" },
+    size: { type: Number, default: 0 },
+    width: { type: Number },
+    height: { type: Number },
+  },
+  { _id: false },
+);
+
 const projectSchema = new Schema(
   {
     projectId: { type: String, required: true, unique: true, index: true },
@@ -40,6 +52,7 @@ const taskSchema = new Schema(
     priority: { type: String, enum: TASK_PRIORITIES, default: "medium" },
     assigneeId: { type: String, default: null, index: true },
     dueDate: { type: String, default: null },
+    attachments: { type: [attachmentSchema], default: [] },
     resolvedAt: { type: Date, default: null },
     resolutionNote: { type: String, default: "" },
     reviewScore: { type: Number, default: null },
