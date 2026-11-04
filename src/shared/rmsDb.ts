@@ -17,14 +17,20 @@ let connecting: Promise<Connection> | null = null;
  * `propertyId`. Ver METRICAS-COMPORTAMIENTO-SPEC.md §3.1.
  */
 export async function getRmsConnection(): Promise<Connection> {
-  if (rmsConn && rmsConn.readyState === 1) return rmsConn;
+  // Ídem pmsDb: una vez creada se reutiliza; el driver reconecta solo.
+  if (rmsConn) return rmsConn;
   if (connecting) return connecting;
 
   const uri = process.env.RMS_MONGODB_URI;
   if (!uri) throw new Error("RMS_MONGODB_URI no esta configurado");
 
   connecting = (async () => {
-    const conn = mongoose.createConnection(uri);
+    const conn = mongoose.createConnection(uri, {
+      maxPoolSize: 3,
+      minPoolSize: 0,
+      maxIdleTimeMS: 30_000,
+      serverSelectionTimeoutMS: 8_000,
+    });
     await conn.asPromise();
     rmsConn = conn;
     console.log("[metrics] RMS DB connected");
