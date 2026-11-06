@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(targetUrl.toString(), {
       headers: {
         'Accept': '*/*',
-        'User-Agent': 'elippser-Tile-Proxy/1.0',
+        'User-Agent': 'Roombir-Tiles/1.0',
       },
       // Using Next.js fetch cache options to heavily cache tiles locally
       next: {
